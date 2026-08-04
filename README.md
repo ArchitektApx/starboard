@@ -1,16 +1,27 @@
 # starboard
 
-A real terminal, shrunk down to a translucent, borderless bar that lives in
-the bottom-right corner of the screen — an extension of the macOS Dock's
-empty space. It's a persistent `zsh` login shell, not a one-shot command
+A real terminal, shrunk down to a translucent, rounded bar that lives
+directly beside the macOS Dock — literally an extension of it, to
+starboard. It's a persistent `zsh` login shell, not a one-shot command
 runner: `cd` and shell state carry over between commands, arrow-key history
 works, and output streams in live, same as any terminal tab.
 
 ## What it does right now
 
-- Frameless, translucent (`NSVisualEffectView`) panel, flush to the
-  bottom-right corner of the main screen, sized to roughly match the Dock's
-  height.
+- Frameless, translucent (`NSVisualEffectView`, all four corners rounded)
+  panel that tracks the Dock live: same height, left edge touching the
+  Dock's right edge, same bottom margin (so they sit on one baseline), and
+  that same margin held on the panel's own right edge. Re-checks the Dock's
+  actual geometry once a second and resizes/repositions itself to match —
+  so it follows along as you resize the Dock or add/remove icons.
+- The Dock's geometry is read live via the Accessibility API (its `AXList`
+  icon-tray element), not guessed or hardcoded — see `CLAUDE.md` for how
+  and why. Requires granting Starboard Accessibility permission once
+  (System Settings → Privacy & Security → Accessibility); until granted, it
+  falls back to an approximate fixed-width panel in the corner. Because
+  this is an unsigned, non-bundled binary rather than a proper `.app`,
+  macOS may treat a rebuild as a "new app" and ask you to re-grant it —
+  that's expected, not a bug.
 - Floats above normal windows, stays visible across every Space (including
   full-screen apps), and never steals focus from whatever app you're in.
 - A full terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)'s

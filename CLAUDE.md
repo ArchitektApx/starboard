@@ -27,20 +27,13 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
   `.nonactivatingPanel` is what lets the terminal view become key *without*
   activating the app or stealing focus from whatever app the user is
   currently in.
-- `AppDelegate.swift` — everything else: builds the panel, sizes/positions
-  it, and wires up the terminal.
-  - `dockHeight()` derives the Dock's height from the gap between
-    `NSScreen.main.frame` and `.visibleFrame` (assumes the Dock is on the
-    bottom edge; returns `nil` — triggering a 64pt fallback — if the Dock is
-    hidden, on a side, or auto-hidden).
-  - `panelFrame(height:)` places the panel flush against the bottom-right
-    corner of the main screen (`screen.frame.maxX - panelWidth`,
-    `screen.frame.minY`) — deliberately not trying to compute the actual
-    right edge of the (usually centered) Dock, since that space is already
-    unused screen real estate.
+- `AppDelegate.swift` — everything else: builds the panel, tracks the Dock
+  to size/position it, and wires up the terminal.
   - The panel's `collectionBehavior` includes `.canJoinAllSpaces` and
     `.fullScreenAuxiliary` so it stays visible across every Space, including
-    over full-screen apps.
+    over full-screen apps. `effectView.layer?.masksToBounds = true` clips
+    the (edge-to-edge) terminal view to the panel's rounded corners —
+    without it, square corners get painted over the rounded blur.
   - The terminal itself is a [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
     `LocalProcessTerminalView`, started once via
     `startProcess(executable: "/bin/zsh", args: ["-l"], ...)`. This is a
@@ -53,6 +46,43 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
     `false`), which is what makes the transparent layer approach work — if
     that ever gets toggled on, the transparency handling would need
     revisiting.
+
+### Dock tracking
+
+The panel positions itself as a companion to the Dock — same height, left
+edge touching the Dock's right edge, same bottom margin as the Dock (so
+they share a baseline), and that same margin held on the panel's own right
+edge. A repeating `Timer` (`dockTrackingInterval`, 1s) recomputes this and
+calls `panel.setFrame` whenever it changes, so it follows the Dock live as
+it's resized or gains/loses icons — there's no notification to observe for
+this, so it's polled.
+
+The Dock's geometry comes from `dockIconTrayFrame()`, which reads the
+`AXList` element (the icon row) from the Dock process's accessibility tree
+via `AXUIElementCreateApplication` / `AXUIElementCopyAttributeValue`. This
+is deliberately **not** `CGWindowListCopyWindowInfo`: on modern macOS the
+Dock's own window frame spans the entire screen (the Dock process also
+hosts desktop wallpaper/icon interaction — see the sibling "Wallpaper"
+window owned by the same process), which is useless for positioning. The
+`AXList` box is close but not exact: its bottom edge sits above the Dock's
+real bottom margin, and its top edge overshoots above the Dock's real top
+edge by a smaller amount — Apple doesn't expose the actual painted chrome
+rectangle through Accessibility at all. `dockBottomCorrection` (6pt) and
+`dockTopCorrection` (4pt) are empirical fixes for that gap, tuned against
+one real Dock; nudge them if the panel's edges visibly drift from the
+Dock's, e.g. at a very different tile size.
+
+Reading another process's accessibility tree requires the user to grant
+Starboard Accessibility permission (`AXIsProcessTrustedWithOptions` is
+called with the prompt option at launch to trigger the system dialog).
+Until granted — or if the Dock's AX tree is ever unreadable —
+`fallbackFrame(on:)` is used instead: a fixed-width panel in the
+bottom-right corner, with height read from the gap between
+`NSScreen.main.frame` and `.visibleFrame` (which doesn't need any special
+permission, but also can't reveal the Dock's *width*). Because Starboard is
+an unsigned, non-bundled binary rather than a signed `.app`, macOS's
+permission system (TCC) can treat a rebuild as a new app identity and
+re-prompt for Accessibility — expected, not a bug.
 
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
 default), which is required for spawning a shell process at all.
