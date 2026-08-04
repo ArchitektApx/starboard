@@ -24,11 +24,11 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
 - `KeyablePanel.swift` — an `NSPanel` subclass that overrides
   `canBecomeKey` to return `true`. Needed because a borderless panel with
   `.nonactivatingPanel` style won't accept keystrokes otherwise, and
-  `.nonactivatingPanel` is what lets the text field become key *without*
+  `.nonactivatingPanel` is what lets the terminal view become key *without*
   activating the app or stealing focus from whatever app the user is
   currently in.
 - `AppDelegate.swift` — everything else: builds the panel, sizes/positions
-  it, and handles command execution.
+  it, and wires up the terminal.
   - `dockHeight()` derives the Dock's height from the gap between
     `NSScreen.main.frame` and `.visibleFrame` (assumes the Dock is on the
     bottom edge; returns `nil` — triggering a 64pt fallback — if the Dock is
@@ -41,11 +41,18 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
   - The panel's `collectionBehavior` includes `.canJoinAllSpaces` and
     `.fullScreenAuxiliary` so it stays visible across every Space, including
     over full-screen apps.
-  - `runCommand(_:)` is wired as the text field's action (fires on Enter).
-    It shells out via `Process` to `/bin/zsh -c "<command>"` with all
-    stdio redirected to `/dev/null` — execution is fire-and-forget by
-    design, there is no output or success/failure feedback in the UI.
+  - The terminal itself is a [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
+    `LocalProcessTerminalView`, started once via
+    `startProcess(executable: "/bin/zsh", args: ["-l"], ...)`. This is a
+    real PTY-backed shell process, not a `Process` spawned per command —
+    that's what makes `cd`, shell history, and arrow-key line editing work
+    across commands instead of resetting each time.
+  - `nativeBackgroundColor`/`layer?.backgroundColor` are set to `.clear` on
+    the terminal view so the panel's blur shows through behind the text;
+    SwiftTerm's Metal renderer is off by default (`useMetalRenderer` starts
+    `false`), which is what makes the transparent layer approach work — if
+    that ever gets toggled on, the transparency handling would need
+    revisiting.
 
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
-default), which is required for `Process` to be able to spawn arbitrary
-shell commands.
+default), which is required for spawning a shell process at all.

@@ -1,9 +1,10 @@
 # starboard
 
-A minimal command runner that lives as a translucent, borderless bar in the
-bottom-right corner of the screen — an extension of the macOS Dock's empty
-space. Type a shell command, press Enter, it runs via `/bin/zsh` and the
-field clears. No Dock icon, no app switcher entry, no window chrome.
+A real terminal, shrunk down to a translucent, borderless bar that lives in
+the bottom-right corner of the screen — an extension of the macOS Dock's
+empty space. It's a persistent `zsh` login shell, not a one-shot command
+runner: `cd` and shell state carry over between commands, arrow-key history
+works, and output streams in live, same as any terminal tab.
 
 ## What it does right now
 
@@ -12,8 +13,10 @@ field clears. No Dock icon, no app switcher entry, no window chrome.
   height.
 - Floats above normal windows, stays visible across every Space (including
   full-screen apps), and never steals focus from whatever app you're in.
-- A single borderless text field. Enter runs the typed string as
-  `/bin/zsh -c "<command>"`, discards its output, and clears the field.
+- A full terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)'s
+  `LocalProcessTerminalView`) backed by a single persistent `/bin/zsh -l`
+  process — shell state, working directory, and history persist across
+  commands, and the blur shows through behind the text.
 - Runs as an accessory process (`NSApp.setActivationPolicy(.accessory)`) —
   no Dock icon, no Cmd+Tab entry.
 

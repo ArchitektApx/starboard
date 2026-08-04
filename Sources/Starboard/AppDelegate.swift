@@ -1,8 +1,9 @@
 import Cocoa
+import SwiftTerm
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: NSPanel!
-    private var commandField: NSTextField!
+    private var terminalView: LocalProcessTerminalView!
 
     private let panelWidth: CGFloat = 300
     private let fallbackHeight: CGFloat = 64
@@ -36,26 +37,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         effectView.layer?.cornerRadius = 12
         effectView.layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
 
-        let field = NSTextField(frame: effectView.bounds.insetBy(dx: 16, dy: 0))
-        field.autoresizingMask = [.width, .height]
-        field.isBordered = false
-        field.isBezeled = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-        field.textColor = .labelColor
-        field.placeholderString = "$"
-        field.target = self
-        field.action = #selector(runCommand(_:))
+        let terminal = LocalProcessTerminalView(frame: effectView.bounds)
+        terminal.autoresizingMask = [.width, .height]
+        // Let the blur behind the panel show through instead of the
+        // terminal's own opaque background.
+        terminal.nativeBackgroundColor = .clear
+        terminal.nativeForegroundColor = .labelColor
+        terminal.layer?.backgroundColor = NSColor.clear.cgColor
 
-        effectView.addSubview(field)
+        effectView.addSubview(terminal)
         panel.contentView = effectView
 
         self.panel = panel
-        self.commandField = field
+        self.terminalView = terminal
 
         panel.orderFrontRegardless()
-        panel.makeFirstResponder(field)
+        panel.makeFirstResponder(terminal)
+
+        // A persistent login shell, not a new Process per command: cd/pwd
+        // state survives between commands, same as a normal terminal tab.
+        terminal.startProcess(executable: "/bin/zsh", args: ["-l"], currentDirectory: NSHomeDirectory())
     }
 
     /// Height of the Dock at the bottom of the main screen, derived from
@@ -75,22 +76,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let x = screen.frame.maxX - panelWidth
         let y = screen.frame.minY
         return NSRect(x: x, y: y, width: panelWidth, height: height)
-    }
-
-    @objc private func runCommand(_ sender: NSTextField) {
-        let command = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        sender.stringValue = ""
-        guard !command.isEmpty else { return }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        process.arguments = ["-c", command]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        process.standardInput = FileHandle.nullDevice
-        // Reaps the child on exit; output is intentionally discarded.
-        process.terminationHandler = { _ in }
-
-        try? process.run()
     }
 }
