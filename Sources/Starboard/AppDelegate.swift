@@ -45,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let promptOptions = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(promptOptions)
 
+        setUpMainMenu()
+
         let panel = KeyablePanel(
             contentRect: currentFrame(),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -109,6 +111,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(timer, forMode: .common)
         trackingTimer = timer
+    }
+
+    /// Cmd+C/Cmd+V/Cmd+A only reach a view's copy(_:)/paste(_:)/selectAll(_:)
+    /// via AppKit's menu-key-equivalent system — there's no such routing
+    /// without a main menu at all, which an accessory app with no Dock icon
+    /// otherwise has no reason to set up. This menu is never shown (the
+    /// nonactivating panel never makes Starboard the frontmost app, so its
+    /// menu bar never displays); it exists purely so those key equivalents
+    /// resolve to the terminal view's standard responder-chain actions.
+    private func setUpMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenuItem.submenu = appMenu
+        appMenu.addItem(withTitle: "Quit Starboard", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenuItem.submenu = editMenu
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func syncFrameToDock() {

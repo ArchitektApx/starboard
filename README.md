@@ -35,16 +35,30 @@ works, and output streams in live, same as any terminal tab.
   whatever vertical slack is left over.
 - Runs as an accessory process (`NSApp.setActivationPolicy(.accessory)`) —
   no Dock icon, no Cmd+Tab entry.
+- A minimal, never-shown main menu wires up Cmd+C/Cmd+V/Cmd+A (copy, paste,
+  select all) — without any menu at all, those key equivalents have nothing
+  to route through and silently do nothing.
 
 ## Known issue
 
 Some prompt-theme glyphs (e.g. oh-my-zsh's `robbyrussell` arrow/git-dirty
-indicators) intermittently render as `?` instead of the correct character.
-Ruled out so far: font coverage (Menlo has the relevant glyphs), locale
-(`LANG` is correctly `en_US.UTF-8`), and raw glyph rendering (`printf
-'➤ ✗\n'` renders correctly outside the prompt). Still
-unresolved — likely something in how the theme's `%(?:...:...)` conditional
-prompt syntax evaluates in this PTY session specifically.
+indicators) intermittently render as `?`. This is a confirmed **upstream
+bug in SwiftTerm itself**, not Starboard's code — see
+[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231),
+where another user reports the same category of corruption with a
+different glyph-heavy prompt theme (powerlevel10k), and the maintainer
+attributes it to CoreText glyph-positioning calls
+(`CTRunGetPositions`/`CTRunGetAdvances`) SwiftTerm likely isn't using
+correctly. Ruled out on Starboard's side first: font coverage, locale,
+raw glyph rendering, the exact zsh prompt-conditional syntax, line
+wrapping, and character-width mismatches — none reproduce it in
+isolation, only live prompt redraws do, which points at the renderer
+rather than anything upstream of it. No fix available short of patching
+SwiftTerm; a prompt theme without these glyphs sidesteps it entirely.
+
+Separately, unrelated and not yet investigated: pasted text briefly
+renders in black instead of the correct foreground color, until the next
+keypress triggers a redraw.
 
 ## Running it
 

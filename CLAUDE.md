@@ -46,6 +46,13 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
     `false`), which is what makes the transparent layer approach work — if
     that ever gets toggled on, the transparency handling would need
     revisiting.
+  - `setUpMainMenu()` builds a minimal `NSMenu` (Quit + Edit: Copy/Paste/
+    Select All) and sets it as `NSApp.mainMenu`. This menu is never
+    visibly shown — the nonactivating panel never makes Starboard the
+    frontmost app — but Cmd+C/Cmd+V/Cmd+A only resolve to a view's
+    `copy(_:)`/`paste(_:)`/`selectAll(_:)` via AppKit's menu-key-equivalent
+    system, so without *some* main menu those keystrokes go nowhere,
+    silently, regardless of whether it's ever drawn on screen.
 
 ### Dock tracking
 
@@ -141,15 +148,42 @@ Because centering depends on the panel's live height, the terminal's
 letting AppKit's autoresizing stretch the terminal to fill the new size
 (which would rewiden the padding asymmetrically as the panel resizes).
 
-### Known issue: prompt glyphs occasionally render as `?`
+### Known issue: prompt glyphs occasionally render as `?` (confirmed upstream SwiftTerm bug)
 
-Some prompt-theme glyphs (oh-my-zsh's `robbyrussell` theme specifically)
-intermittently render as `?`. Ruled out during investigation: font
-coverage (Menlo has the relevant glyphs — confirmed via
-`CTFontGetGlyphsForCharacters`), locale (`LANG=en_US.UTF-8` is set, and
-`Terminal.getEnvironmentVariables` in SwiftTerm sets this by default
-regardless), and raw glyph rendering (`printf '➤ ✗\n'` renders
-correctly when run directly, outside the theme's prompt machinery). Still
-open — most likely something in how the theme's `%(?:...:...)` conditional
-prompt syntax evaluates in this specific PTY session, not a font/encoding
-problem.
+Some prompt-theme glyphs (oh-my-zsh's `robbyrussell` theme specifically —
+`➜` U+27A4 and `✗` U+2717) intermittently render as `?`. Confirmed to be
+a bug in SwiftTerm's own glyph rendering, not Starboard's code — see
+[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231),
+where a different glyph-heavy prompt theme (powerlevel10k) shows the same
+category of corruption, and the maintainer attributes it to CoreText
+glyph-positioning calls (`CTRunGetPositions`/`CTRunGetAdvances`) that
+SwiftTerm likely isn't using correctly.
+
+Ruled out on Starboard's side, each confirmed by direct testing rather
+than assumption, before concluding it was upstream:
+- **Font coverage**: Menlo has both glyphs (`CTFontGetGlyphsForCharacters`
+  confirmed it; SF Mono, tried first, did not).
+- **Locale**: `LANG=en_US.UTF-8` is set (`Terminal.getEnvironmentVariables`
+  in SwiftTerm sets this by default regardless of caller environment).
+- **Raw glyph rendering**: `printf '➤ ✗\n'` renders correctly.
+- **Raw ANSI color immediately before the glyph**: `printf
+  '\033[1;32m➜\033[0m test\n'` renders correctly — rules out an
+  SGR-then-multibyte-character parsing bug.
+- **The theme's exact zsh syntax** (`%(?:...:...)` conditional and
+  `%1{...%}` width-override hint): `print -P` with the theme's literal
+  fragment renders correctly in isolation.
+- **Line wrapping**: forcing the arrow onto a wrapped line
+  (`printf '%*s' "$COLUMNS" '' | tr ' ' '.'` filler + the glyph) still
+  rendered clean.
+- **Character-width mismatch**: checked `UnicodeWidthData.swift`'s
+  `eastAsianWide` table directly — neither U+27A4 nor U+2717 is
+  classified as double-width, so there's no width disagreement with
+  zsh's own `%1{...%}` single-column assumption.
+
+The common thread: every *static* reproduction (a single `print`/`printf`)
+renders correctly; it only appears during a *live* prompt redraw — ZLE
+(zsh's line editor) erasing and repainting an existing prompt line with
+new content, e.g. after `cd`-ing into a git repo changes the prompt's
+git-status segment. That points at SwiftTerm's redraw/overwrite path
+specifically, consistent with the upstream issue above. No fix available
+short of patching SwiftTerm.
