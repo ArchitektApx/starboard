@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+.build/
 .next/
 coverage/
 *.log
@@ -8,3 +9,4 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
+.claude/
