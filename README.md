@@ -27,5 +27,34 @@ swift build
 .build/debug/Starboard
 ```
 
-There's no packaging or auto-launch-at-login yet — it's a plain SPM
-executable you start manually.
+## Running it at login
+
+`scripts/install.sh` builds the release binary and registers it as a
+per-user [LaunchAgent](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html) —
+macOS's mechanism for starting and supervising background processes. It
+starts Starboard immediately and arms it to start at every future login.
+
+```
+scripts/install.sh
+```
+
+Turn it off (stops it now, and skips it at future logins):
+
+```
+launchctl unload ~/Library/LaunchAgents/com.starboard.app.plist
+```
+
+Turn it back on:
+
+```
+launchctl load ~/Library/LaunchAgents/com.starboard.app.plist
+```
+
+Remove the login item entirely:
+
+```
+scripts/uninstall.sh
+```
+
+Logs (stdout/stderr from the running process) go to
+`~/Library/Logs/Starboard.log`.
