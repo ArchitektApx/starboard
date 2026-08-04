@@ -79,13 +79,39 @@ Until granted — or if the Dock's AX tree is ever unreadable —
 `fallbackFrame(on:)` is used instead: a fixed-width panel in the
 bottom-right corner, with height read from the gap between
 `NSScreen.main.frame` and `.visibleFrame` (which doesn't need any special
-permission, but also can't reveal the Dock's *width*). Because Starboard is
-an unsigned, non-bundled binary rather than a signed `.app`, macOS's
-permission system (TCC) can treat a rebuild as a new app identity and
-re-prompt for Accessibility — expected, not a bug.
+permission, but also can't reveal the Dock's *width*).
 
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
 default), which is required for spawning a shell process at all.
+
+### Why `scripts/install.sh` packages a `.app` bundle
+
+Confirmed by direct debugging (temporary `FileHandle.standardError` calls
+around `AXIsProcessTrusted()` and the `AXError` from
+`AXUIElementCopyAttributeValue`, logged via the LaunchAgent's
+`StandardErrorPath`): a process launched by `launchctl` gets
+`AXIsProcessTrusted() == false` and `AXError -25211` (`kAXErrorAPIDisabled`)
+even when Accessibility looks granted in System Settings — while the exact
+same binary launched directly from a Terminal/Bash shell reports
+`trusted == true`. The difference is TCC's "responsible process"
+attribution: a process launched interactively from Terminal can inherit
+Terminal's own Accessibility trust, but a `launchd`-spawned process has no
+such parent to inherit from and needs its own standalone grant. That grant
+didn't reliably stick for the raw, unbundled executable — its ad-hoc code
+signature (assigned automatically by the toolchain) is content-derived and
+changes on every rebuild, giving TCC nothing stable to track.
+
+The fix: `install.sh` copies the built binary into a minimal
+`Starboard.app` (`Contents/Info.plist` + `Contents/MacOS/Starboard`) and
+signs it with `codesign --sign - --identifier com.starboard.app` — an
+explicit, fixed identifier rather than the toolchain's default hash-based
+one. That gives TCC a stable identity to key the grant against, so it
+survives rebuilds. The LaunchAgent's `ProgramArguments` points at
+`Starboard.app/Contents/MacOS/Starboard`, not the bare `.build/release/Starboard`.
+Running the raw executable directly (`swift run`, or the debug build) still
+works for local iteration since it inherits trust from its Terminal parent
+— it's specifically the persistent, `launchd`-launched instance that needs
+the bundle.
 
 ### Terminal styling and layout
 

@@ -18,10 +18,11 @@ works, and output streams in live, same as any terminal tab.
   icon-tray element), not guessed or hardcoded — see `CLAUDE.md` for how
   and why. Requires granting Starboard Accessibility permission once
   (System Settings → Privacy & Security → Accessibility); until granted, it
-  falls back to an approximate fixed-width panel in the corner. Because
-  this is an unsigned, non-bundled binary rather than a proper `.app`,
-  macOS may treat a rebuild as a "new app" and ask you to re-grant it —
-  that's expected, not a bug.
+  falls back to an approximate fixed-width panel in the corner. `scripts/install.sh`
+  packages the binary into a minimal `.app` with a fixed, ad-hoc codesigned
+  identity specifically so this grant survives rebuilds — running the raw
+  executable directly (e.g. `swift run`) won't have a stable identity and
+  may need re-granting each time.
 - Floats above normal windows, stays visible across every Space (including
   full-screen apps), and never steals focus from whatever app you're in.
 - A full terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)'s
@@ -54,8 +55,10 @@ swift build
 
 ## Running it at login
 
-`scripts/install.sh` builds the release binary and registers it as a
-per-user [LaunchAgent](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html) —
+`scripts/install.sh` builds the release binary, packages it as
+`Starboard.app` (with a fixed, ad-hoc codesigned identity — see above),
+and registers it as a per-user
+[LaunchAgent](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html) —
 macOS's mechanism for starting and supervising background processes. It
 starts Starboard immediately and arms it to start at every future login.
 
