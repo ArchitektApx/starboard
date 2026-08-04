@@ -68,9 +68,9 @@ window owned by the same process), which is useless for positioning. The
 real bottom margin, and its top edge overshoots above the Dock's real top
 edge by a smaller amount — Apple doesn't expose the actual painted chrome
 rectangle through Accessibility at all. `dockBottomCorrection` (6pt) and
-`dockTopCorrection` (4pt) are empirical fixes for that gap, tuned against
-one real Dock; nudge them if the panel's edges visibly drift from the
-Dock's, e.g. at a very different tile size.
+`dockTopCorrection` (5pt) are empirical fixes for that gap, tuned pixel by
+pixel against one real Dock; nudge them if the panel's edges visibly drift
+from the Dock's, e.g. at a very different tile size.
 
 Reading another process's accessibility tree requires the user to grant
 Starboard Accessibility permission (`AXIsProcessTrustedWithOptions` is
@@ -86,3 +86,44 @@ re-prompt for Accessibility — expected, not a bug.
 
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
 default), which is required for spawning a shell process at all.
+
+### Terminal styling and layout
+
+The terminal uses Menlo, not `NSFont.monospacedSystemFont` (SF Mono) —
+verified programmatically (`CTFontGetGlyphsForCharacters`) that SF Mono is
+missing glyphs common shell prompt themes use, e.g. `➤` (U+27A4), which
+Menlo has. `terminalFont` is computed once in `AppDelegate.init()` rather
+than per-launch, since it's reused by both the initial layout and every
+subsequent resize.
+
+`terminalContentFrame(in:)` insets by `terminalPadding` (8pt) and then
+vertically centers the content within that padding. This exists because
+SwiftTerm derives its row count as `Int(height / cellHeight)` — a floor
+operation — which almost never divides the available height evenly; a
+plain edge inset leaves the leftover slack stuck at the bottom, reading as
+content pinned to the top. `estimatedCellHeight(for:)` mirrors SwiftTerm's
+own internal calculation (`AppleTerminalView.computeFontDimensions`:
+ascent + descent + leading at 1.0 line spacing) so the padding can predict
+the row count before SwiftTerm lays out. `terminalFontSize` (11pt) and
+`terminalPadding` (8pt) are chosen together so a ~57-60pt Dock height
+lands on exactly two visible rows.
+
+Because centering depends on the panel's live height, the terminal's
+`autoresizingMask` is `[.width]` only — height is NOT auto-flexible.
+`syncFrameToDock()` explicitly recomputes `terminalView.frame` via
+`terminalContentFrame(in:)` every time it resizes the panel, rather than
+letting AppKit's autoresizing stretch the terminal to fill the new size
+(which would rewiden the padding asymmetrically as the panel resizes).
+
+### Known issue: prompt glyphs occasionally render as `?`
+
+Some prompt-theme glyphs (oh-my-zsh's `robbyrussell` theme specifically)
+intermittently render as `?`. Ruled out during investigation: font
+coverage (Menlo has the relevant glyphs — confirmed via
+`CTFontGetGlyphsForCharacters`), locale (`LANG=en_US.UTF-8` is set, and
+`Terminal.getEnvironmentVariables` in SwiftTerm sets this by default
+regardless), and raw glyph rendering (`printf '➤ ✗\n'` renders
+correctly when run directly, outside the theme's prompt machinery). Still
+open — most likely something in how the theme's `%(?:...:...)` conditional
+prompt syntax evaluates in this specific PTY session, not a font/encoding
+problem.

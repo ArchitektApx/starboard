@@ -1,5 +1,6 @@
 import Cocoa
 import ApplicationServices
+import CoreText
 import SwiftTerm
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -18,7 +19,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the panel's edges drift from the Dock's over time or on other
     /// displays/tile sizes.
     private let dockBottomCorrection: CGFloat = 6
-    private let dockTopCorrection: CGFloat = 4
+    private let dockTopCorrection: CGFloat = 5
+    /// Inset between the panel's edge and the terminal content, and the
+    /// font size that content renders at. Chosen together so that, at a
+    /// Dock height around 57-60pt, exactly two terminal rows fit — the
+    /// current line and the one before it.
+    private let terminalPadding: CGFloat = 8
+    private let terminalFontSize: CGFloat = 11
+    private let terminalFont: NSFont
+
+    override init() {
+        // Menlo, not the system SF Mono: SF Mono is missing glyphs common
+        // shell prompt themes use (e.g. ➜ U+27A4), which render as a
+        // fallback placeholder instead. Menlo has broad coverage here and
+        // is what Terminal.app itself has defaulted to for years.
+        terminalFont = NSFont(name: "Menlo", size: 11) ?? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Triggers the system Accessibility permission prompt on first
@@ -46,7 +63,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: panel.frame.size))
         effectView.autoresizingMask = [.width, .height]
-        effectView.material = .hudWindow
+        // .menu reads much closer to the Dock's neutral frosted chrome than
+        // .hudWindow, which renders noticeably darker in both appearances.
+        effectView.material = .menu
         effectView.blendingMode = .behindWindow
         effectView.state = .active
         effectView.wantsLayer = true
@@ -55,9 +74,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // view (which fills the whole panel edge-to-edge) can paint square
         // corners over the rounded blur.
         effectView.layer?.masksToBounds = true
+        // A faint edge highlight, similar to the Dock's own subtle stroke.
+        effectView.layer?.borderWidth = 1
+        effectView.layer?.borderColor = NSColor.white.withAlphaComponent(0.2).cgColor
 
-        let terminal = LocalProcessTerminalView(frame: effectView.bounds)
-        terminal.autoresizingMask = [.width, .height]
+        let terminal = LocalProcessTerminalView(frame: terminalContentFrame(in: effectView.bounds))
+        // Width only — height is recomputed and recentered explicitly in
+        // syncFrameToDock, since SwiftTerm's row count is a floor() of
+        // pixel height and rarely divides it evenly, leaving slack that
+        // needs to be centered rather than pinned to the top or bottom.
+        terminal.autoresizingMask = [.width]
+        terminal.font = terminalFont
         // Let the blur behind the panel show through instead of the
         // terminal's own opaque background.
         terminal.nativeBackgroundColor = .clear
@@ -88,6 +115,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let frame = currentFrame()
         guard panel.frame != frame else { return }
         panel.setFrame(frame, display: true)
+        terminalView.frame = terminalContentFrame(in: NSRect(origin: .zero, size: frame.size))
+    }
+
+    /// Padded frame for the terminal content, vertically centered within
+    /// that padding. SwiftTerm derives its row count as
+    /// `floor(height / cellHeight)`, which rarely divides the available
+    /// height evenly — the leftover slack is centered here rather than
+    /// left stuck at the top, which is what a plain edge inset produces.
+    private func terminalContentFrame(in bounds: NSRect) -> NSRect {
+        let usableWidth = bounds.width - terminalPadding * 2
+        let usableHeight = bounds.height - terminalPadding * 2
+        let cellHeight = estimatedCellHeight(for: terminalFont)
+        let rows = max(1, Int(usableHeight / cellHeight))
+        let contentHeight = CGFloat(rows) * cellHeight
+        let verticalSlack = (usableHeight - contentHeight) / 2
+        return NSRect(
+            x: bounds.minX + terminalPadding,
+            y: bounds.minY + terminalPadding + verticalSlack,
+            width: max(usableWidth, 0),
+            height: max(contentHeight, 0)
+        )
+    }
+
+    /// Mirrors SwiftTerm's own internal cell-height calculation (ascent +
+    /// descent + leading, at its default 1.0 line spacing) so the padding
+    /// above can predict its row count before SwiftTerm itself lays out.
+    private func estimatedCellHeight(for font: NSFont) -> CGFloat {
+        let ascent = CTFontGetAscent(font)
+        let descent = CTFontGetDescent(font)
+        let leading = CTFontGetLeading(font)
+        return ceil(ascent + descent + leading)
     }
 
     /// Sizes and positions the panel as a companion to the Dock: same

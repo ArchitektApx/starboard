@@ -28,8 +28,22 @@ works, and output streams in live, same as any terminal tab.
   `LocalProcessTerminalView`) backed by a single persistent `/bin/zsh -l`
   process — shell state, working directory, and history persist across
   commands, and the blur shows through behind the text.
+- `.menu` material with a faint white border, echoing the Dock's own
+  neutral frosted chrome and edge highlight. 8pt padding, Menlo 11pt, tuned
+  to fit exactly two rows at a ~57-60pt Dock height and centered in
+  whatever vertical slack is left over.
 - Runs as an accessory process (`NSApp.setActivationPolicy(.accessory)`) —
   no Dock icon, no Cmd+Tab entry.
+
+## Known issue
+
+Some prompt-theme glyphs (e.g. oh-my-zsh's `robbyrussell` arrow/git-dirty
+indicators) intermittently render as `?` instead of the correct character.
+Ruled out so far: font coverage (Menlo has the relevant glyphs), locale
+(`LANG` is correctly `en_US.UTF-8`), and raw glyph rendering (`printf
+'➤ ✗\n'` renders correctly outside the prompt). Still
+unresolved — likely something in how the theme's `%(?:...:...)` conditional
+prompt syntax evaluates in this PTY session specifically.
 
 ## Running it
 
