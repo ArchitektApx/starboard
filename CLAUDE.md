@@ -189,6 +189,19 @@ Because centering depends on the panel's live height, the terminal's
 letting AppKit's autoresizing stretch the terminal to fill the new size
 (which would rewiden the padding asymmetrically as the panel resizes).
 
+### Known issue: pasted text briefly renders in wrong foreground color
+
+Pasted text renders in black instead of the correct theme foreground color
+until the next keypress forces a full redraw. Not Starboard's rendering —
+`paste(_:)` is SwiftTerm's own (`MacTerminalView.paste`), reached via the
+main menu's key equivalent since there's no other paste path (no visible
+menu bar, no right-click context menu). Tried and ruled out: routing the
+menu's Paste action through a wrapper that calls `terminalView.paste(_:)`
+then forces `needsDisplay = true` ~50ms later — didn't help, so the wrong
+color is already baked in by the time the pasted text is echoed back and
+drawn, not something a post-hoc invalidate can fix. Not yet investigated
+further; low priority.
+
 ### Watch item: prompt glyphs previously rendered as `?` (status: not recurring, cause unconfirmed)
 
 Some prompt-theme glyphs (oh-my-zsh's `robbyrussell` theme — `➜` U+27A4
