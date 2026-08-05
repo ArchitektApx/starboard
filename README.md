@@ -43,24 +43,13 @@ works, and output streams in live, same as any terminal tab.
 
 ## Known issue
 
-Some prompt-theme glyphs (e.g. oh-my-zsh's `robbyrussell` arrow/git-dirty
-indicators) intermittently render as `?`. This is a confirmed **upstream
-bug in SwiftTerm itself**, not Starboard's code — see
-[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231),
-where another user reports the same category of corruption with a
-different glyph-heavy prompt theme (powerlevel10k), and the maintainer
-attributes it to CoreText glyph-positioning calls
-(`CTRunGetPositions`/`CTRunGetAdvances`) SwiftTerm likely isn't using
-correctly. Ruled out on Starboard's side first: font coverage, locale,
-raw glyph rendering, the exact zsh prompt-conditional syntax, line
-wrapping, and character-width mismatches — none reproduce it in
-isolation, only live prompt redraws do, which points at the renderer
-rather than anything upstream of it. No fix available short of patching
-SwiftTerm; a prompt theme without these glyphs sidesteps it entirely.
+Pasted text briefly renders in black instead of the correct foreground
+color, until the next keypress triggers a redraw. Not yet investigated.
 
-Separately, unrelated and not yet investigated: pasted text briefly
-renders in black instead of the correct foreground color, until the next
-keypress triggers a redraw.
+(Separately, some prompt-theme glyphs used to intermittently render as
+`?` during live prompt redraws — a suspected upstream SwiftTerm bug, see
+[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231).
+Hasn't recurred recently; see `CLAUDE.md` for details and status.)
 
 ## Running it
 

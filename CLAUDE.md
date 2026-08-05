@@ -189,42 +189,17 @@ Because centering depends on the panel's live height, the terminal's
 letting AppKit's autoresizing stretch the terminal to fill the new size
 (which would rewiden the padding asymmetrically as the panel resizes).
 
-### Known issue: prompt glyphs occasionally render as `?` (confirmed upstream SwiftTerm bug)
+### Watch item: prompt glyphs previously rendered as `?` (status: not recurring, cause unconfirmed)
 
-Some prompt-theme glyphs (oh-my-zsh's `robbyrussell` theme specifically —
-`➜` U+27A4 and `✗` U+2717) intermittently render as `?`. Confirmed to be
-a bug in SwiftTerm's own glyph rendering, not Starboard's code — see
-[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231),
-where a different glyph-heavy prompt theme (powerlevel10k) shows the same
-category of corruption, and the maintainer attributes it to CoreText
-glyph-positioning calls (`CTRunGetPositions`/`CTRunGetAdvances`) that
-SwiftTerm likely isn't using correctly.
+Some prompt-theme glyphs (oh-my-zsh's `robbyrussell` theme — `➜` U+27A4
+and `✗` U+2717) used to intermittently render as `?` during live prompt
+redraws (ZLE erasing/repainting an existing prompt line, e.g. after a
+`cd` changes the git-status segment). Starboard-side causes were ruled
+out by direct testing (font coverage, locale, raw glyph/ANSI rendering,
+line wrapping, character-width tables) — see
+[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231)
+for the likely upstream cause (SwiftTerm's CoreText glyph-positioning).
 
-Ruled out on Starboard's side, each confirmed by direct testing rather
-than assumption, before concluding it was upstream:
-- **Font coverage**: Menlo has both glyphs (`CTFontGetGlyphsForCharacters`
-  confirmed it; SF Mono, tried first, did not).
-- **Locale**: `LANG=en_US.UTF-8` is set (`Terminal.getEnvironmentVariables`
-  in SwiftTerm sets this by default regardless of caller environment).
-- **Raw glyph rendering**: `printf '➤ ✗\n'` renders correctly.
-- **Raw ANSI color immediately before the glyph**: `printf
-  '\033[1;32m➜\033[0m test\n'` renders correctly — rules out an
-  SGR-then-multibyte-character parsing bug.
-- **The theme's exact zsh syntax** (`%(?:...:...)` conditional and
-  `%1{...%}` width-override hint): `print -P` with the theme's literal
-  fragment renders correctly in isolation.
-- **Line wrapping**: forcing the arrow onto a wrapped line
-  (`printf '%*s' "$COLUMNS" '' | tr ' ' '.'` filler + the glyph) still
-  rendered clean.
-- **Character-width mismatch**: checked `UnicodeWidthData.swift`'s
-  `eastAsianWide` table directly — neither U+27A4 nor U+2717 is
-  classified as double-width, so there's no width disagreement with
-  zsh's own `%1{...%}` single-column assumption.
-
-The common thread: every *static* reproduction (a single `print`/`printf`)
-renders correctly; it only appears during a *live* prompt redraw — ZLE
-(zsh's line editor) erasing and repainting an existing prompt line with
-new content, e.g. after `cd`-ing into a git repo changes the prompt's
-git-status segment. That points at SwiftTerm's redraw/overwrite path
-specifically, consistent with the upstream issue above. No fix available
-short of patching SwiftTerm.
+Hasn't recurred as of 2026-08-05, cause of the change unknown (possibly
+just a Mac restart) — not confirmed fixed. If it comes back, the ruled-out
+list above doesn't need re-checking.
