@@ -25,6 +25,22 @@ find, resize, or alt-tab back to.
 - Accessibility permission (prompted on first launch) — used to read the
   Dock's live position. Starboard still works without it, just pinned to
   a fixed corner instead of hugging the Dock.
+- Currently assumes a bottom-docked Dock on the main display. Left/right
+  Dock placement and multi-monitor setups aren't handled yet — feedback
+  and contributions welcome.
+
+## Security & trust
+
+Starboard makes no network requests and collects no data — there's
+nothing in the source that could, since it's under 700 lines across 4
+Swift files, worth reading yourself rather than taking on faith. The one
+sensitive-looking permission it asks for, Accessibility, is used for
+exactly one thing: reading the Dock's on-screen position so the panel can
+sit next to it. `scripts/install.sh` only touches your own user-level
+LaunchAgents and login keychain (never system-wide, never `sudo`), and
+the local code-signing certificate it creates is scoped narrowly to code
+signing — it exists purely so macOS remembers the Accessibility grant
+across rebuilds, not for anything else.
 
 ## Install
 
@@ -60,3 +76,7 @@ Logs: `~/Library/Logs/Starboard.log`
 
 See `CLAUDE.md` for architecture, design decisions, and the full
 write-up on both issues above.
+
+## License
+
+MIT — see `LICENSE`.
