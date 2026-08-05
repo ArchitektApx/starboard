@@ -12,6 +12,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let fallbackHeight: CGFloat = 64
     private let fallbackMargin: CGFloat = 8
     private let cornerRadius: CGFloat = 12
+    /// Starboard's own panel color — a near-black deep navy, independent of
+    /// the Dock's material and whatever's on the desktop behind it. First
+    /// pass; tune the RGB/alpha here to taste.
+    private let panelTintColor = NSColor(calibratedRed: 0.02, green: 0.035, blue: 0.06, alpha: 0.65)
     private let dockTrackingInterval: TimeInterval = 1.0
     /// Empirical corrections for the gap between the Dock's AXList (icon
     /// row) bounding box and its actual painted chrome, which Accessibility
@@ -65,8 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: panel.frame.size))
         effectView.autoresizingMask = [.width, .height]
-        // .menu reads much closer to the Dock's neutral frosted chrome than
-        // .hudWindow, which renders noticeably darker in both appearances.
         effectView.material = .menu
         effectView.blendingMode = .behindWindow
         effectView.state = .active
@@ -79,6 +81,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A faint edge highlight, similar to the Dock's own subtle stroke.
         effectView.layer?.borderWidth = 1
         effectView.layer?.borderColor = NSColor.white.withAlphaComponent(0.2).cgColor
+
+        // Starboard's own fixed tint, layered on top of the system blur.
+        // The Dock's exact color/opacity is a private, OS-version-tuned
+        // recipe (not a public material) that reacts live to the desktop
+        // behind it — chasing it means drifting apart on every wallpaper
+        // and macOS release. This tint is constant instead: always close
+        // to black, independent of what's behind the panel.
+        let tintView = NSView(frame: effectView.bounds)
+        tintView.autoresizingMask = [.width, .height]
+        tintView.wantsLayer = true
+        tintView.layer?.backgroundColor = panelTintColor.cgColor
+        effectView.addSubview(tintView)
 
         let terminal = LocalProcessTerminalView(frame: terminalContentFrame(in: effectView.bounds))
         // Width only — height is recomputed and recentered explicitly in

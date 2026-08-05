@@ -163,6 +163,23 @@ persistent, `launchd`-launched instance that needs the signed bundle.
 
 ### Terminal styling and layout
 
+As of v0.5.3, the panel's color is Starboard's own — a fixed, near-black
+`panelTintColor` layered as a plain `NSView` between the `NSVisualEffectView`
+blur and the terminal content, not a match for the Dock's own chrome. Dock
+tracking (`syncFrameToDock`/`dockIconTrayFrame`) still governs the panel's
+*height and position* only. Color was deliberately decoupled: the Dock's
+translucency is a private, OS-version-tuned WindowServer recipe (not a
+public `NSVisualEffectView.Material`), and both it and Starboard's previous
+`.menu` material use `blendingMode = .behindWindow` — i.e. both react live
+to whatever's on the desktop — but with different light/dark response
+curves, so they visibly drifted apart as wallpaper brightness changed
+(confirmed by the user switching from a dark to a bright wallpaper: the
+Dock got lighter, Starboard didn't, at a similar rate). Rather than chase
+a moving, private target that would also vary across macOS releases,
+Starboard now keeps a constant look independent of desktop content —
+tune `panelTintColor`'s RGB/alpha directly rather than trying to sample
+or approximate the Dock's material.
+
 The terminal uses Menlo, not `NSFont.monospacedSystemFont` (SF Mono) —
 verified programmatically (`CTFontGetGlyphsForCharacters`) that SF Mono is
 missing glyphs common shell prompt themes use, e.g. `➤` (U+27A4), which
