@@ -3,26 +3,68 @@
 # to start at every future login. Safe to re-run (e.g. after a rebuild) —
 # it just rebuilds, repackages, and reloads it.
 #
-# Packages the binary into a minimal .app bundle with a fixed, ad-hoc
-# codesigned identity (--identifier), rather than running the raw
-# executable directly. This matters specifically for Accessibility
-# permission (needed to track the Dock's geometry): a process launched
-# by launchd (as this one is, once installed) has no "responsible" parent
-# app to inherit trust from the way a process launched from Terminal
-# does, so it needs its own stable TCC identity — an unbundled binary
-# with the toolchain's default per-build ad-hoc signature doesn't reliably
-# keep that grant across rebuilds, but a bundle signed with a fixed
-# --identifier does.
+# Packages the binary into a minimal .app bundle and code-signs it with a
+# local, self-signed certificate (created on first run, see below), rather
+# than running the raw executable directly. This matters specifically for
+# Accessibility permission (needed to track the Dock's geometry): a process
+# launched by launchd (as this one is, once installed) has no "responsible"
+# parent app to inherit trust from the way a process launched from Terminal
+# does, so it needs its own stable TCC identity.
+#
+# Ad-hoc signing (`codesign --sign -`) is NOT enough for that stability,
+# even with a fixed --identifier: with no real signing authority behind it,
+# TCC still anchors trust to the binary's content hash under the hood, which
+# changes on every rebuild. A certificate-based signature anchors trust to
+# the certificate instead, which stays stable across rebuilds regardless of
+# what changes in the code. It doesn't need to be a paid Apple Developer ID
+# for this to work — a local, self-signed certificate is enough, since the
+# binary only ever runs locally via launchd and is never distributed or
+# downloaded (which is what Gatekeeper's stricter trust-chain checks are
+# actually for).
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="com.starboard.app"
+CERT_NAME="Starboard Local Signing"
+LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 BUILD_DIR="$REPO_DIR/.build/release"
 BIN_PATH="$BUILD_DIR/Starboard"
 APP_PATH="$BUILD_DIR/Starboard.app"
 APP_BIN_PATH="$APP_PATH/Contents/MacOS/Starboard"
 PLIST_PATH="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_PATH="$HOME/Library/Logs/Starboard.log"
+
+if ! security find-certificate -c "$CERT_NAME" "$LOGIN_KEYCHAIN" >/dev/null 2>&1; then
+    echo "Creating local code-signing certificate ($CERT_NAME)..."
+    echo "macOS will likely ask for your login password once, to confirm"
+    echo "trusting this new certificate for code signing."
+    CERT_DIR="$(mktemp -d)"
+    trap 'rm -rf "$CERT_DIR"' EXIT
+
+    openssl req -x509 -newkey rsa:2048 -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" \
+        -days 3650 -nodes -subj "/CN=$CERT_NAME" \
+        -addext "keyUsage=digitalSignature" \
+        -addext "extendedKeyUsage=codeSigning" \
+        -addext "basicConstraints=critical,CA:false"
+
+    # -legacy: OpenSSL 3.x defaults to AES/SHA-256 for PKCS12, which
+    # macOS's Security framework can't parse ("MAC verification failed")
+    # -- it expects the older RC2/3DES-based format this flag restores.
+    openssl pkcs12 -export -legacy -out "$CERT_DIR/cert.p12" \
+        -inkey "$CERT_DIR/key.pem" -in "$CERT_DIR/cert.pem" -passout pass:starboard
+
+    # -T grants codesign key access without a keychain-unlock prompt on
+    # every future run.
+    security import "$CERT_DIR/cert.p12" -k "$LOGIN_KEYCHAIN" \
+        -P starboard -T /usr/bin/codesign -A
+
+    # No -d: this trusts the cert for the *user's* login keychain only,
+    # not system-wide, so it doesn't need sudo.
+    security add-trusted-cert -r trustRoot -p codeSign \
+        -k "$LOGIN_KEYCHAIN" "$CERT_DIR/cert.pem"
+
+    echo "Certificate created and trusted for code signing."
+fi
 
 echo "Building release binary..."
 (cd "$REPO_DIR" && swift build -c release)
@@ -51,7 +93,7 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-codesign --force --deep --sign - --identifier "$LABEL" "$APP_PATH"
+codesign --force --deep --sign "$CERT_NAME" --identifier "$LABEL" "$APP_PATH"
 
 mkdir -p "$HOME/Library/LaunchAgents"
 

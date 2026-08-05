@@ -18,11 +18,12 @@ works, and output streams in live, same as any terminal tab.
   icon-tray element), not guessed or hardcoded — see `CLAUDE.md` for how
   and why. Requires granting Starboard Accessibility permission once
   (System Settings → Privacy & Security → Accessibility); until granted, it
-  falls back to an approximate fixed-width panel in the corner. `scripts/install.sh`
-  packages the binary into a minimal `.app` with a fixed, ad-hoc codesigned
-  identity specifically so this grant survives rebuilds — running the raw
-  executable directly (e.g. `swift run`) won't have a stable identity and
-  may need re-granting each time.
+  falls back to an approximate fixed-width panel in the corner.
+  `scripts/install.sh` packages the binary into a minimal `.app`, signed
+  with a local self-signed certificate (created on first run) rather than
+  ad-hoc, so this grant survives rebuilds — running the raw executable
+  directly (e.g. `swift run`) won't have a stable identity and may need
+  re-granting each time.
 - Floats above normal windows, stays visible across every Space (including
   full-screen apps), and never steals focus from whatever app you're in.
 - A full terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)'s
@@ -70,11 +71,19 @@ swift build
 ## Running it at login
 
 `scripts/install.sh` builds the release binary, packages it as
-`Starboard.app` (with a fixed, ad-hoc codesigned identity — see above),
-and registers it as a per-user
+`Starboard.app` (signed with a local self-signed certificate — see
+above), and registers it as a per-user
 [LaunchAgent](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html) —
 macOS's mechanism for starting and supervising background processes. It
 starts Starboard immediately and arms it to start at every future login.
+
+On first run it also creates and trusts that certificate, which may
+prompt for your macOS login password (to confirm the new trust setting).
+The certificate itself is only created once (verified: re-running
+`install.sh` doesn't create a duplicate), but whether the password prompt
+itself recurs on later rebuilds hasn't been fully pinned down yet — it
+showed up again on a subsequent rebuild in testing, source not yet
+identified. Not disruptive, just not fully understood yet.
 
 ```
 scripts/install.sh

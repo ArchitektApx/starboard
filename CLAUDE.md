@@ -108,17 +108,57 @@ didn't reliably stick for the raw, unbundled executable — its ad-hoc code
 signature (assigned automatically by the toolchain) is content-derived and
 changes on every rebuild, giving TCC nothing stable to track.
 
-The fix: `install.sh` copies the built binary into a minimal
-`Starboard.app` (`Contents/Info.plist` + `Contents/MacOS/Starboard`) and
-signs it with `codesign --sign - --identifier com.starboard.app` — an
-explicit, fixed identifier rather than the toolchain's default hash-based
-one. That gives TCC a stable identity to key the grant against, so it
-survives rebuilds. The LaunchAgent's `ProgramArguments` points at
-`Starboard.app/Contents/MacOS/Starboard`, not the bare `.build/release/Starboard`.
-Running the raw executable directly (`swift run`, or the debug build) still
-works for local iteration since it inherits trust from its Terminal parent
-— it's specifically the persistent, `launchd`-launched instance that needs
-the bundle.
+First attempt at a fix: `install.sh` copies the built binary into a
+minimal `Starboard.app` (`Contents/Info.plist` + `Contents/MacOS/Starboard`)
+and ad-hoc signs it with an explicit, fixed `--identifier`. This did *not*
+fully work — confirmed by rebuilding, reinstalling, and rechecking the
+debug log, which still showed `trusted=false` after a rebuild. Even with a
+fixed identifier, ad-hoc signing (`codesign --sign -`) has no real signing
+authority behind it, so the code requirement macOS ends up checking still
+effectively pins to the binary's content, which changes every rebuild.
+
+The actual fix: `install.sh` creates (on first run) a local, self-signed
+code-signing certificate (`Starboard Local Signing`, in the login keychain,
+trusted for the `codeSign` policy via `security add-trusted-cert`), then
+signs the bundle with `codesign --sign "Starboard Local Signing"
+--identifier com.starboard.app`. Verified via `codesign -d -r-` that the
+resulting designated requirement is
+`identifier "com.starboard.app" and certificate leaf = H"<hash>"` — no
+binary-content hash in it at all, just the identifier and a hash of the
+*certificate*, which stays constant across rebuilds as long as the same
+certificate keeps signing it. Confirmed working end-to-end: granted once,
+then rebuilt (binary content changed) and reinstalled without any
+re-prompt, geometry stayed live-tracked throughout.
+
+Two gotchas hit along the way, both now handled in the script:
+- `openssl pkcs12 -export` defaults (OpenSSL 3.x) to AES/SHA-256
+  encryption, which macOS's Security framework can't parse
+  (`SecKeychainItemImport: MAC verification failed`) — needs the
+  `-legacy` flag to fall back to the older RC2/3DES format macOS expects.
+- Iterating on the fix (unbundled → ad-hoc bundle → cert-signed bundle,
+  all at the same `.build/release/Starboard.app` path) left multiple
+  stale "Starboard" entries in System Settings → Accessibility. Only one
+  corresponds to the current signing identity; the others do nothing and
+  are just clutter — if Accessibility looks granted but the panel still
+  won't track the Dock, that's the first thing to check.
+
+`install.sh`'s certificate step is idempotent (`security find-certificate`
+checked before creating one), so re-running it doesn't create duplicate
+certificates — confirmed via `security find-certificate -a` after a
+rebuild, still exactly one match. What's *not* yet confirmed: a macOS
+login-password prompt (for the trust-setting change) reappeared on a
+subsequent rebuild in testing despite the certificate not being
+recreated, so something in the reinstall path still triggers it
+sometimes. Not yet root-caused — worth checking `security
+show-keychain-info` (ruled out: not an auto-lock timeout) and whether
+it's really `add-trusted-cert` firing again versus something else (e.g.
+`codesign` key access) if it keeps happening. The LaunchAgent's
+`ProgramArguments` points at
+`Starboard.app/Contents/MacOS/Starboard`, not the bare
+`.build/release/Starboard`. Running the raw executable directly
+(`swift run`, or the debug build) still works for local iteration since it
+inherits trust from its Terminal parent — it's specifically the
+persistent, `launchd`-launched instance that needs the signed bundle.
 
 ### Terminal styling and layout
 
