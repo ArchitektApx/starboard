@@ -11,8 +11,9 @@ works, and output streams in live, same as any terminal tab.
 - Frameless, translucent (`NSVisualEffectView`, all four corners rounded)
   panel that tracks the Dock live: same height, left edge touching the
   Dock's right edge, same bottom margin (so they sit on one baseline), and
-  that same margin held on the panel's own right edge. Re-checks the Dock's
-  actual geometry once a second and resizes/repositions itself to match —
+  its own right edge flush against the screen's right edge with no margin
+  at all. Re-checks the Dock's actual geometry once a second and
+  resizes/repositions itself to match —
   so it follows along as you resize the Dock or add/remove icons.
 - The Dock's geometry is read live via the Accessibility API (its `AXList`
   icon-tray element), not guessed or hardcoded — see `CLAUDE.md` for how
@@ -77,13 +78,12 @@ above), and registers it as a per-user
 macOS's mechanism for starting and supervising background processes. It
 starts Starboard immediately and arms it to start at every future login.
 
-On first run it also creates and trusts that certificate, which may
-prompt for your macOS login password (to confirm the new trust setting).
-The certificate itself is only created once (verified: re-running
-`install.sh` doesn't create a duplicate), but whether the password prompt
-itself recurs on later rebuilds hasn't been fully pinned down yet — it
-showed up again on a subsequent rebuild in testing, source not yet
-identified. Not disruptive, just not fully understood yet.
+Creating that certificate may prompt for your macOS login password (to
+confirm the new trust setting) the first time. In testing it also
+recurred on rebuilds that changed the binary — root cause not pinned
+down — but that's an acceptable cost: it reads as a normal "confirm this
+updated app" prompt, once per actual code change, not once per
+`install.sh` run.
 
 ```
 scripts/install.sh

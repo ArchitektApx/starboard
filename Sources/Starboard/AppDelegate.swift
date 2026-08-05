@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// doesn't expose directly. Tuned against a real Dock; nudge these if
     /// the panel's edges drift from the Dock's over time or on other
     /// displays/tile sizes.
-    private let dockBottomCorrection: CGFloat = 6
+    private let dockBottomCorrection: CGFloat = 5
     private let dockTopCorrection: CGFloat = 5
     /// Inset between the panel's edge and the terminal content, and the
     /// font size that content renders at. Chosen together so that, at a
@@ -179,8 +179,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Sizes and positions the panel as a companion to the Dock: same
     /// height, same bottom margin (so they sit on one baseline), left edge
-    /// touching the Dock's right edge, and that same margin held on the
-    /// panel's own right edge.
+    /// touching the Dock's right edge, and its own right edge flush against
+    /// the screen's right edge (no margin there at all).
     private func currentFrame() -> NSRect {
         guard let screen = NSScreen.main else {
             return NSRect(x: 0, y: 0, width: fallbackWidth, height: fallbackHeight)
@@ -197,9 +197,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let maxY = rawDock.maxY - dockTopCorrection
         let dock = NSRect(x: rawDock.minX, y: minY, width: rawDock.width, height: maxY - minY)
 
-        let margin = dock.minY - screen.frame.minY
         let x = dock.maxX
-        let width = max(screen.frame.maxX - margin - x, 0)
+        let width = max(screen.frame.maxX - x, 0)
         return NSRect(x: x, y: dock.minY, width: width, height: dock.height)
     }
 

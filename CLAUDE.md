@@ -58,8 +58,9 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
 
 The panel positions itself as a companion to the Dock — same height, left
 edge touching the Dock's right edge, same bottom margin as the Dock (so
-they share a baseline), and that same margin held on the panel's own right
-edge. A repeating `Timer` (`dockTrackingInterval`, 1s) recomputes this and
+they share a baseline), and its own right edge flush against the screen's
+right edge, no margin there at all. A repeating `Timer`
+(`dockTrackingInterval`, 1s) recomputes this and
 calls `panel.setFrame` whenever it changes, so it follows the Dock live as
 it's resized or gains/loses icons — there's no notification to observe for
 this, so it's polled.
@@ -74,7 +75,7 @@ window owned by the same process), which is useless for positioning. The
 `AXList` box is close but not exact: its bottom edge sits above the Dock's
 real bottom margin, and its top edge overshoots above the Dock's real top
 edge by a smaller amount — Apple doesn't expose the actual painted chrome
-rectangle through Accessibility at all. `dockBottomCorrection` (6pt) and
+rectangle through Accessibility at all. `dockBottomCorrection` (5pt) and
 `dockTopCorrection` (5pt) are empirical fixes for that gap, tuned pixel by
 pixel against one real Dock; nudge them if the panel's edges visibly drift
 from the Dock's, e.g. at a very different tile size.
@@ -145,15 +146,15 @@ Two gotchas hit along the way, both now handled in the script:
 `install.sh`'s certificate step is idempotent (`security find-certificate`
 checked before creating one), so re-running it doesn't create duplicate
 certificates — confirmed via `security find-certificate -a` after a
-rebuild, still exactly one match. What's *not* yet confirmed: a macOS
-login-password prompt (for the trust-setting change) reappeared on a
-subsequent rebuild in testing despite the certificate not being
-recreated, so something in the reinstall path still triggers it
-sometimes. Not yet root-caused — worth checking `security
-show-keychain-info` (ruled out: not an auto-lock timeout) and whether
-it's really `add-trusted-cert` firing again versus something else (e.g.
-`codesign` key access) if it keeps happening. The LaunchAgent's
-`ProgramArguments` points at
+rebuild, still exactly one match. A macOS login-password prompt (for the
+trust-setting change) has recurred on rebuilds that changed the binary,
+despite the certificate itself not being recreated — root cause not
+pinned down (tried: it's not an auto-lock timeout, per
+`security show-keychain-info`). Treated as acceptable rather than a bug
+to keep chasing: it reads as a normal "confirm this updated app" prompt
+tied to actual code changes, not something that fires on every
+`install.sh` run regardless of whether anything changed. The
+LaunchAgent's `ProgramArguments` points at
 `Starboard.app/Contents/MacOS/Starboard`, not the bare
 `.build/release/Starboard`. Running the raw executable directly
 (`swift run`, or the debug build) still works for local iteration since it
