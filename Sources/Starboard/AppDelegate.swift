@@ -3,6 +3,13 @@ import ApplicationServices
 import CoreText
 import SwiftTerm
 
+/// `Color`'s public initializer takes 16-bit (0...65535) components; this
+/// takes the familiar 8-bit (0...255) form and scales up (`* 257` maps
+/// 0...255 onto 0...65535 exactly, since 255 * 257 == 65535).
+private func ansiColor(_ red: UInt16, _ green: UInt16, _ blue: UInt16) -> Color {
+    Color(red: red * 257, green: green * 257, blue: blue * 257)
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: NSPanel!
     private var terminalView: LocalProcessTerminalView!
@@ -31,6 +38,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let terminalPadding: CGFloat = 8
     private let terminalFontSize: CGFloat = 11
     private let terminalFont: NSFont
+    /// Starboard's own ANSI palette (indices 0-15: black/red/green/yellow/
+    /// blue/magenta/cyan/white, then bright variants) — muted ocean blues
+    /// and teals instead of the harsh primaries most terminal defaults use,
+    /// with red/green nodding to a ship's port/starboard navigation lights.
+    /// This only changes what an ANSI color code *renders as*; it has no
+    /// effect on which color a shell prompt theme chooses to use for a
+    /// given segment — that logic lives in the user's own shell config
+    /// (e.g. oh-my-zsh), independent of the terminal emulator. First pass;
+    /// tune to taste.
+    private let starboardAnsiPalette: [Color] = [
+        ansiColor(20, 24, 33),    // black
+        ansiColor(198, 74, 90),   // red — port light
+        ansiColor(79, 157, 105),  // green — starboard light
+        ansiColor(196, 154, 62),  // yellow — brass
+        ansiColor(58, 124, 165),  // blue — deep ocean
+        ansiColor(133, 110, 168), // magenta — dusk
+        ansiColor(69, 156, 156),  // cyan — seafoam
+        ansiColor(196, 190, 172), // white — sand
+        ansiColor(75, 87, 99),    // bright black — slate
+        ansiColor(222, 102, 118), // bright red
+        ansiColor(111, 191, 135), // bright green
+        ansiColor(224, 186, 105), // bright yellow
+        ansiColor(95, 168, 211),  // bright blue
+        ansiColor(169, 143, 201), // bright magenta
+        ansiColor(114, 214, 207), // bright cyan
+        ansiColor(230, 224, 208), // bright white — foam
+    ]
 
     override init() {
         // Menlo, not the system SF Mono: SF Mono is missing glyphs common
@@ -106,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         terminal.nativeBackgroundColor = .clear
         terminal.nativeForegroundColor = .labelColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
+        terminal.installColors(starboardAnsiPalette)
 
         effectView.addSubview(terminal)
         panel.contentView = effectView

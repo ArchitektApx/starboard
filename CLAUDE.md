@@ -180,6 +180,21 @@ Starboard now keeps a constant look independent of desktop content —
 tune `panelTintColor`'s RGB/alpha directly rather than trying to sample
 or approximate the Dock's material.
 
+As of v0.5.4, the 16 ANSI colors are also Starboard's own
+(`starboardAnsiPalette`, installed via `terminal.installColors(_:)` —
+SwiftTerm's public wrapper around `Terminal.installPalette`, which needs
+exactly 16 `Color` entries) — muted ocean blues/teals instead of harsh
+primaries, with red/green nodding to a ship's port/starboard navigation
+lights. `Color`'s public initializer takes 16-bit (0...65535) components,
+not the usual 8-bit hex form, hence the small `ansiColor(_:_:_:)` helper
+that scales 8-bit input up (`* 257`, since `255 * 257 == 65535` exactly).
+Important distinction for future theming work: this only changes what an
+ANSI color code *renders as* in the emulator — it has no effect on *which*
+color a shell prompt theme picks for a given segment (e.g. oh-my-zsh's
+`robbyrussell` always uses green for its arrow, red for a dirty git
+status, etc.); that logic lives entirely in the user's own shell config
+and runs identically in any terminal emulator.
+
 The terminal uses Menlo, not `NSFont.monospacedSystemFont` (SF Mono) —
 verified programmatically (`CTFontGetGlyphsForCharacters`) that SF Mono is
 missing glyphs common shell prompt themes use, e.g. `➤` (U+27A4), which

@@ -31,10 +31,15 @@ works, and output streams in live, same as any terminal tab.
   `LocalProcessTerminalView`) backed by a single persistent `/bin/zsh -l`
   process — shell state, working directory, and history persist across
   commands, and the blur shows through behind the text.
-- `.menu` material with a faint white border, echoing the Dock's own
-  neutral frosted chrome and edge highlight. 8pt padding, Menlo 11pt, tuned
-  to fit exactly two rows at a ~57-60pt Dock height and centered in
-  whatever vertical slack is left over.
+- A look that's Starboard's own rather than a Dock lookalike: `.menu`
+  blur with a faint white border and edge highlight, plus a fixed
+  near-black tint layered on top so it stays consistently dark regardless
+  of wallpaper (the Dock's own translucency is a private, OS-version-tuned
+  recipe — not something a third-party app can pixel-match, or would want
+  to chase). A muted, nautical 16-color ANSI palette (ocean blues/teals,
+  port/starboard red/green) replaces the harsh terminal-default primaries.
+  8pt padding, Menlo 11pt, tuned to fit exactly two rows at a ~57-60pt Dock
+  height and centered in whatever vertical slack is left over.
 - Runs as an accessory process (`NSApp.setActivationPolicy(.accessory)`) —
   no Dock icon, no Cmd+Tab entry.
 - A minimal, never-shown main menu wires up Cmd+C/Cmd+V/Cmd+A (copy, paste,
