@@ -1,105 +1,62 @@
-# starboard
+# Starboard
 
-A real terminal, shrunk down to a translucent, rounded bar that lives
-directly beside the macOS Dock — literally an extension of it, to
-starboard. It's a persistent `zsh` login shell, not a one-shot command
-runner: `cd` and shell state carry over between commands, arrow-key history
-works, and output streams in live, same as any terminal tab.
+Talk to your machine, quick.
 
-## What it does right now
+Starboard is a floating terminal that lives beside your macOS Dock —
+always on screen, on every desktop, one keystroke away. No window to
+find, resize, or alt-tab back to.
 
-- Frameless, translucent (`NSVisualEffectView`, all four corners rounded)
-  panel that tracks the Dock live: same height, left edge touching the
-  Dock's right edge, same bottom margin (so they sit on one baseline), and
-  its own right edge flush against the screen's right edge with no margin
-  at all. Re-checks the Dock's actual geometry once a second and
-  resizes/repositions itself to match —
-  so it follows along as you resize the Dock or add/remove icons.
-- The Dock's geometry is read live via the Accessibility API (its `AXList`
-  icon-tray element), not guessed or hardcoded — see `CLAUDE.md` for how
-  and why. Requires granting Starboard Accessibility permission once
-  (System Settings → Privacy & Security → Accessibility); until granted, it
-  falls back to an approximate fixed-width panel in the corner.
-  `scripts/install.sh` packages the binary into a minimal `.app`, signed
-  with a local self-signed certificate (created on first run) rather than
-  ad-hoc, so this grant survives rebuilds — running the raw executable
-  directly (e.g. `swift run`) won't have a stable identity and may need
-  re-granting each time.
-- Floats above normal windows, stays visible across every Space (including
-  full-screen apps), and never steals focus from whatever app you're in.
-- A full terminal emulator ([SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)'s
-  `LocalProcessTerminalView`) backed by a single persistent `/bin/zsh -l`
-  process — shell state, working directory, and history persist across
-  commands, and the blur shows through behind the text.
-- A look that's Starboard's own rather than a Dock lookalike: `.menu`
-  blur with a faint white border and edge highlight, plus a fixed
-  near-black tint layered on top so it stays consistently dark regardless
-  of wallpaper (the Dock's own translucency is a private, OS-version-tuned
-  recipe — not something a third-party app can pixel-match, or would want
-  to chase). A muted, nautical 16-color ANSI palette (ocean blues/teals,
-  port/starboard red/green) replaces the harsh terminal-default primaries.
-  8pt padding, Menlo 11pt, tuned to fit exactly two rows at a ~57-60pt Dock
-  height and centered in whatever vertical slack is left over.
-- Runs as an accessory process (`NSApp.setActivationPolicy(.accessory)`) —
-  no Dock icon, no Cmd+Tab entry.
-- A minimal, never-shown main menu wires up Cmd+C/Cmd+V/Cmd+A (copy, paste,
-  select all) — without any menu at all, those key equivalents have nothing
-  to route through and silently do nothing.
+![Starboard demo](assets/demo.gif)
 
-## Known issue
+## What it does
 
-Pasted text briefly renders in black instead of the correct foreground
-color, until the next keypress triggers a redraw. Not yet investigated.
+- Sits directly beside the Dock, tracking its height and position live.
+- Visible on every Space, including over full-screen apps — never steals
+  focus from whatever app you're in.
+- A real, persistent shell (`zsh -l`): `cd`, history, and state carry over
+  between commands, same as any terminal tab — not a one-shot command
+  runner.
+- Its own dark look and a muted, nautical ANSI color palette — not a
+  system lookalike.
 
-(Separately, some prompt-theme glyphs used to intermittently render as
-`?` during live prompt redraws — a suspected upstream SwiftTerm bug, see
-[SwiftTerm#231](https://github.com/migueldeicaza/SwiftTerm/issues/231).
-Hasn't recurred recently; see `CLAUDE.md` for details and status.)
+## Requirements
 
-## Running it
+- macOS 13+
+- Accessibility permission (prompted on first launch) — used to read the
+  Dock's live position. Starboard still works without it, just pinned to
+  a fixed corner instead of hugging the Dock.
+
+## Install
+
+Run it once:
 
 ```
 swift build
 .build/debug/Starboard
 ```
 
-## Running it at login
-
-`scripts/install.sh` builds the release binary, packages it as
-`Starboard.app` (signed with a local self-signed certificate — see
-above), and registers it as a per-user
-[LaunchAgent](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html) —
-macOS's mechanism for starting and supervising background processes. It
-starts Starboard immediately and arms it to start at every future login.
-
-Creating that certificate may prompt for your macOS login password (to
-confirm the new trust setting) the first time. In testing it also
-recurred on rebuilds that changed the binary — root cause not pinned
-down — but that's an acceptable cost: it reads as a normal "confirm this
-updated app" prompt, once per actual code change, not once per
-`install.sh` run.
+Run at login (packages and code-signs a `.app`, registers it as a
+LaunchAgent):
 
 ```
 scripts/install.sh
 ```
 
-Turn it off (stops it now, and skips it at future logins):
+Stop / start / remove:
 
 ```
-launchctl unload ~/Library/LaunchAgents/com.starboard.app.plist
+launchctl unload ~/Library/LaunchAgents/com.starboard.app.plist   # stop
+launchctl load ~/Library/LaunchAgents/com.starboard.app.plist     # start
+scripts/uninstall.sh                                              # remove entirely
 ```
 
-Turn it back on:
+Logs: `~/Library/Logs/Starboard.log`
 
-```
-launchctl load ~/Library/LaunchAgents/com.starboard.app.plist
-```
+## Known issues
 
-Remove the login item entirely:
+- Pasted text briefly renders in the wrong color until the next keypress.
+- (Previously) some prompt glyphs rendered as `?` during live redraws —
+  hasn't recurred recently.
 
-```
-scripts/uninstall.sh
-```
-
-Logs (stdout/stderr from the running process) go to
-`~/Library/Logs/Starboard.log`.
+See `CLAUDE.md` for architecture, design decisions, and the full
+write-up on both issues above.
