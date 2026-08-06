@@ -2,13 +2,28 @@
 
 [![Latest release](https://img.shields.io/github/v/release/palamim/starboard)](https://github.com/palamim/starboard/releases/latest)
 
-Talk to your machine, quick.
+A terminal that's just always there — not summoned, not dismissed.
 
-Starboard is a floating terminal that lives beside your macOS Dock —
-always on screen, on every desktop, one keystroke away. No window to
-find, resize, or alt-tab back to.
+Starboard lives permanently beside your macOS Dock: on screen, on every
+desktop, all the time. There's no hotkey to call it up and no window to
+find, resize, or alt-tab back to, because it never goes away in the
+first place.
 
 ![Starboard demo](assets/demo.gif)
+
+## How this differs from Quake-style terminals
+
+Guake, Yakuake, tilda, iTerm2's hotkey window, Ghostty's quick terminal —
+these summon a terminal with a hotkey, hand it focus, and dismiss it
+again when you're done. Same family, different interaction model:
+Starboard has no hotkey, never takes focus, and has no summon/dismiss
+cycle. It's not called up — it's just sitting there, the way the Dock
+itself is.
+
+That's the point of it: moving between desktops running a command in
+whatever project directory you're in, then going straight back to the
+editor — without switching to a terminal app, waiting on a window
+animation, or losing your place when you switch back.
 
 ## What it does
 
