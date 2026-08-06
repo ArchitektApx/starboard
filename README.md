@@ -1,5 +1,7 @@
 # Starboard
 
+[![Latest release](https://img.shields.io/github/v/release/palamim/starboard)](https://github.com/palamim/starboard/releases/latest)
+
 Talk to your machine, quick.
 
 Starboard is a floating terminal that lives beside your macOS Dock —
