@@ -221,6 +221,40 @@ Because centering depends on the panel's live height, the terminal's
 letting AppKit's autoresizing stretch the terminal to fill the new size
 (which would rewiden the padding asymmetrically as the panel resizes).
 
+### Expand/collapse
+
+Cmd+E toggles `isExpanded`, growing the panel upward to (almost) full
+screen height for when Dock-height (two rows) isn't enough — e.g. running
+something like Claude Code in there instead of a couple of shell lines.
+Wired through the same hidden `NSMenu` key-equivalent mechanism as
+Copy/Paste/Select All (`setUpMainMenu`) — no visible menu, no button, just
+a key equivalent that resolves via AppKit's menu system regardless of the
+menu never being drawn.
+
+Growth is upward only: `currentFrame()`'s `x`, width, and bottom `y` stay
+exactly as they are for the collapsed case — still live-tracking the
+Dock — and only the top edge moves, from the Dock's own height up to
+`screen.visibleFrame.maxY`. Deliberately `visibleFrame.maxY`, not
+`frame.maxY`: the menu bar sits at a higher `NSWindowLevel` than this
+panel's `.floating`, so a frame flush with the physical screen top doesn't
+get *clipped* there, it gets *drawn over* — confirmed by testing, with
+`frame.maxY` the top ~1 row of terminal content and the rounded top
+corners were hidden behind the menu bar, not cut off by frame math.
+`visibleFrame.maxY` already excludes the menu bar's reserved strip
+(notch height included) as a matter of what `NSScreen` reports directly —
+no empirical correction constant needed here, unlike
+`dockTopCorrection`/`dockBottomCorrection`, which exist only because
+Accessibility has no equivalent direct answer for the Dock's painted
+chrome.
+
+`syncFrameToDock()`'s 1s timer isn't paused while expanded — it keeps
+calling `currentFrame()` every tick regardless, and `currentFrame()`
+itself branches on `isExpanded`, so the panel keeps following the Dock's
+live x-position/baseline even at full height; only which edge is
+Dock-relative (bottom, collapsed) vs. screen-relative (top, expanded)
+changes. Toggling calls `syncFrameToDock()` immediately rather than
+waiting for the next tick.
+
 ### Known issue: pasted text briefly renders in wrong foreground color
 
 Pasted text renders in black instead of the correct theme foreground color

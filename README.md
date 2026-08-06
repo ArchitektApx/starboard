@@ -18,6 +18,9 @@ find, resize, or alt-tab back to.
   runner.
 - Its own dark look and a muted, nautical ANSI color palette — not a
   system lookalike.
+- Cmd+E expands it to full screen height (growing upward from the Dock)
+  when you need more room — long output, or running something like Claude
+  Code in there — then Cmd+E again to snap back to Dock height.
 
 ## Requirements
 

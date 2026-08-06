@@ -14,6 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: NSPanel!
     private var terminalView: LocalProcessTerminalView!
     private var trackingTimer: Timer!
+    /// Toggled by the hidden Cmd+E menu item. When true, `currentFrame()`
+    /// grows the panel upward to the top of the screen instead of matching
+    /// the Dock's height — the bottom edge (and x/width) still track the
+    /// Dock live, only the top edge changes.
+    private var isExpanded = false
 
     private let fallbackWidth: CGFloat = 300
     private let fallbackHeight: CGFloat = 64
@@ -176,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
+        appMenu.addItem(withTitle: "Toggle Expanded", action: #selector(toggleExpanded(_:)), keyEquivalent: "e")
         appMenu.addItem(withTitle: "Quit Starboard", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         let editMenuItem = NSMenuItem()
@@ -187,6 +193,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         NSApp.mainMenu = mainMenu
+    }
+
+    /// Cmd+E, resolved the same key-equivalent way as Copy/Paste/Select All
+    /// above — reaches here even though the hidden menu is never drawn.
+    /// Flips between the Dock-height default and full screen height, then
+    /// applies immediately rather than waiting for the next tracking tick.
+    @objc private func toggleExpanded(_ sender: Any?) {
+        isExpanded.toggle()
+        syncFrameToDock()
     }
 
     private func syncFrameToDock() {
@@ -248,7 +263,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let x = dock.maxX
         let width = max(screen.frame.maxX - x, 0)
-        return NSRect(x: x, y: dock.minY, width: width, height: dock.height)
+        // Same bottom edge either way — dock.minY is the shared baseline —
+        // but expanded grows the top edge up to the menu bar instead of
+        // stopping at the Dock's own height. visibleFrame.maxY (not
+        // frame.maxY) is what excludes the menu bar's reserved strip
+        // (including notch height) — frame.maxY is the physical screen
+        // edge, which the menu bar draws over since it sits at a higher
+        // window level than this panel's .floating, not something a frame
+        // that merely stops short of it can avoid.
+        let height = isExpanded ? screen.visibleFrame.maxY - dock.minY : dock.height
+        return NSRect(x: x, y: dock.minY, width: width, height: height)
     }
 
     /// Used before Accessibility permission is granted (or if the Dock's
@@ -258,9 +282,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the Dock's actual width, so this can't touch its right edge.
     private func fallbackFrame(on screen: NSScreen) -> NSRect {
         let reserved = screen.visibleFrame.minY - screen.frame.minY
-        let height = reserved > 4 ? reserved : fallbackHeight
+        let collapsedHeight = reserved > 4 ? reserved : fallbackHeight
         let x = screen.frame.maxX - fallbackWidth - fallbackMargin
         let y = screen.frame.minY + fallbackMargin
+        let height = isExpanded ? screen.visibleFrame.maxY - y : collapsedHeight
         return NSRect(x: x, y: y, width: fallbackWidth, height: height)
     }
 
