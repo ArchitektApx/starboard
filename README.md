@@ -45,7 +45,29 @@ the local code-signing certificate it creates is scoped narrowly to code
 signing — it exists purely so macOS remembers the Accessibility grant
 across rebuilds, not for anything else.
 
-## Install
+## Download
+
+Grab the latest build from [Releases](https://github.com/palamim/starboard/releases/latest), then:
+
+```
+unzip Starboard.zip
+mv Starboard.app /Applications/
+open /Applications/Starboard.app
+```
+
+The build is ad-hoc signed, not notarized (notarization needs a paid
+Apple Developer account), so on first launch Gatekeeper will block it —
+open System Settings → Privacy & Security, scroll down, and click **Open
+Anyway** next to the Starboard entry. If you'd rather not click through
+that warning, the source is under 700 lines across 4 Swift files — worth
+reading, and buildable yourself with `swift build` below instead.
+
+Each release is signed ad-hoc, and that signature differs between builds,
+so updating to a new version may ask you to re-grant Accessibility
+permission (System Settings → Privacy & Security → Accessibility) even if
+you'd already granted it for the previous one.
+
+## Build from source
 
 Run it once:
 
