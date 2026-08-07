@@ -13,13 +13,25 @@
 # at all" check and let the binary run once approved -- is sufficient
 # here. No entitlements file is applied, matching install.sh: Starboard
 # is unsandboxed and needs no entitlements either way.
+#
+# Builds into its own .build/release-dist/, deliberately NOT
+# install.sh's .build/release/ -- that path is also where the
+# LaunchAgent's ProgramArguments points. The two used to collide: running
+# this script after install.sh clobbered the cert-signed
+# .build/release/Starboard.app with an ad-hoc-signed one, silently
+# breaking Accessibility trust for the already-installed, launchd-run
+# instance (confirmed by hand: `codesign -dvvv` on the clobbered bundle
+# showed `flags=0x2(adhoc)` and a cdhash-pinned designated requirement,
+# not the certificate's). Separate output directories make that
+# collision structurally impossible instead of relying on remembering
+# not to run the two scripts against the same tree.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="com.starboard.app"
 ARM64_SCRATCH="$REPO_DIR/.build-arm64"
 X86_64_SCRATCH="$REPO_DIR/.build-x86_64"
-APP_PATH="$REPO_DIR/.build/release/Starboard.app"
+APP_PATH="$REPO_DIR/.build/release-dist/Starboard.app"
 APP_BIN_PATH="$APP_PATH/Contents/MacOS/Starboard"
 ZIP_PATH="$REPO_DIR/Starboard.zip"
 
