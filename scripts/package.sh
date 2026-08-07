@@ -52,10 +52,11 @@ echo "Building release binary (x86_64)..."
 
 echo "Packaging $APP_PATH..."
 rm -rf "$APP_PATH"
-mkdir -p "$APP_PATH/Contents/MacOS"
+mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 lipo -create -output "$APP_BIN_PATH" \
     "$ARM64_SCRATCH/arm64-apple-macosx/release/Starboard" \
     "$X86_64_SCRATCH/x86_64-apple-macosx/release/Starboard"
+cp "$REPO_DIR/assets/AppIcon.icns" "$APP_PATH/Contents/Resources/AppIcon.icns"
 
 cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -68,6 +69,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>Starboard</string>
     <key>CFBundleExecutable</key>
     <string>Starboard</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSUIElement</key>
