@@ -17,19 +17,33 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="com.starboard.app"
-BUILD_DIR="$REPO_DIR/.build/release"
-BIN_PATH="$BUILD_DIR/Starboard"
-APP_PATH="$BUILD_DIR/Starboard.app"
+ARM64_SCRATCH="$REPO_DIR/.build-arm64"
+X86_64_SCRATCH="$REPO_DIR/.build-x86_64"
+APP_PATH="$REPO_DIR/.build/release/Starboard.app"
 APP_BIN_PATH="$APP_PATH/Contents/MacOS/Starboard"
 ZIP_PATH="$REPO_DIR/Starboard.zip"
 
-echo "Building release binary..."
-(cd "$REPO_DIR" && swift build -c release)
+# Two single-arch builds + lipo, not `swift build --arch arm64 --arch
+# x86_64` in one invocation: that form hands the universal-binary step to
+# xcbuild, which needs a full Xcode install and isn't available with just
+# Command Line Tools. Each --arch build also needs its own --scratch-path:
+# sharing one .build/ across arches corrupts SwiftPM's build database
+# (confirmed by hand -- a plain second `swift build --arch x86_64` after
+# an `--arch arm64` build in the same .build/ fails with "command ...
+# not registered", even though the first build's binary is still fine on
+# disk). Isolated scratch dirs sidestep that entirely.
+echo "Building release binary (arm64)..."
+(cd "$REPO_DIR" && swift build -c release --arch arm64 --scratch-path "$ARM64_SCRATCH")
+
+echo "Building release binary (x86_64)..."
+(cd "$REPO_DIR" && swift build -c release --arch x86_64 --scratch-path "$X86_64_SCRATCH")
 
 echo "Packaging $APP_PATH..."
 rm -rf "$APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS"
-cp "$BIN_PATH" "$APP_BIN_PATH"
+lipo -create -output "$APP_BIN_PATH" \
+    "$ARM64_SCRATCH/arm64-apple-macosx/release/Starboard" \
+    "$X86_64_SCRATCH/x86_64-apple-macosx/release/Starboard"
 
 cat > "$APP_PATH/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

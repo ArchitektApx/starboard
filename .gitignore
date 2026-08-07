@@ -2,6 +2,8 @@ node_modules/
 dist/
 build/
 .build/
+.build-arm64/
+.build-x86_64/
 .next/
 coverage/
 *.log
