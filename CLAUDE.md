@@ -242,7 +242,15 @@ Two places this is handled:
   independent of whether they read the README: Starboard has no menu
   bar, no Dock icon, and no other visible UI to put a hint in, but
   everyone who hits this *will* be looking at the terminal, wondering
-  why it's not glued to the Dock.
+  why it's not glued to the Dock. First attempt was a three-line
+  explainer; cut to one short line after testing it for real — this
+  panel only ever shows ~2 rows, so anything longer scrolls out of view
+  almost as soon as the shell starts producing its own output, and
+  needs scrolling back up to even find. Same reasoning kept the Cmd+E/
+  Cmd+Q hint (`terminal.toolTip`, set right below where colors are
+  installed) out of the terminal entirely — a hover tooltip costs
+  nothing until it's actually useful, instead of permanently competing
+  for space in an already-tiny panel.
 
 `install.sh`'s certificate step is idempotent (`security find-certificate`
 checked before creating one), so re-running it doesn't create duplicate

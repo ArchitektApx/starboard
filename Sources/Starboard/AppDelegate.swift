@@ -152,6 +152,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         terminal.nativeForegroundColor = .labelColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
         terminal.installColors(starboardAnsiPalette)
+        // The only discoverability hint for Cmd+E/Cmd+Q: there's no menu
+        // bar, Dock icon, or button to put one in, and feeding it into the
+        // terminal as text (tried for the Accessibility hint above) reads
+        // poorly in a panel this short -- it scrolls out of view almost
+        // immediately and needs the user to scroll back up to find it. A
+        // tooltip costs nothing until someone's cursor is actually
+        // sitting still over the panel, which is exactly when it's useful
+        // and never otherwise in the way.
+        terminal.toolTip = "⌘E expand · ⌘Q quit"
 
         effectView.addSubview(terminal)
         panel.contentView = effectView
@@ -173,10 +182,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // mistaken for shell output or land in history) since that's the
         // only UI this menu-bar-less, Dock-icon-less app has to say
         // anything at all -- there's nowhere else a user would see this.
+        // Kept to one short line deliberately: a multi-line explainer
+        // (tried first) reads fine right when it's fed, but this panel
+        // only ever shows ~2 rows, so it scrolls out of view almost
+        // immediately once the shell starts producing its own output --
+        // longer didn't mean clearer, just more of it to scroll back to.
         if !accessibilityTrusted {
-            terminal.feed(text: "Starboard: Accessibility isn't granted, so it's pinned to a fixed corner instead of the Dock.\r\n" +
-                "Already shows as granted in System Settings? Remove that entry and re-add Starboard.app --\r\n" +
-                "toggling the checkbox back on won't refresh it after an update.\r\n\r\n")
+            terminal.feed(text: "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n\r\n")
         }
 
         // A persistent login shell, not a new Process per command: cd/pwd
