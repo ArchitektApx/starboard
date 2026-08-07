@@ -142,6 +142,33 @@ Two gotchas hit along the way, both now handled in the script:
   corresponds to the current signing identity; the others do nothing and
   are just clutter — if Accessibility looks granted but the panel still
   won't track the Dock, that's the first thing to check.
+- If you have both a build-from-source copy (installed via
+  `scripts/install.sh`) and a downloaded release installed, expect two
+  "Starboard" entries in the Accessibility list, since each is signed
+  differently. If the one you just enabled doesn't seem to take, remove
+  the other entry (select it, click **−**) and re-enable the remaining
+  one.
+
+### Login Items are a simpler path for downloaded builds
+
+The certificate dance above exists specifically for a `launchd`
+LaunchAgent, i.e. `scripts/install.sh`'s install path — it's not needed
+for a downloaded release `.app` that a user adds to Login Items
+(System Settings → General → Login Items & Extensions → +) instead.
+Confirmed end-to-end after a full restart: the ad-hoc-signed downloaded
+build, added to Login Items and nothing else, came up already glued to
+the Dock — fast, and with no Accessibility re-prompt. Plausible
+explanation, not independently verified: Login Items are launched via
+loginwindow, which (like a Terminal-launched process, and unlike a bare
+`launchd` LaunchAgent) has a "responsible process" TCC can attribute
+trust through, so the same content-hash-pinned ad-hoc signature that
+fails for a raw LaunchAgent works fine here. Practical takeaway: a
+downloaded build doesn't need `install.sh`'s LaunchAgent/certificate
+machinery at all — Login Items alone is enough, and is what the README
+now recommends for that path. `install.sh` remains the right tool for
+the build-from-source loop, where the binary (and its ad-hoc signature)
+changes on every rebuild and Login Items won't re-resolve that on its
+own the way the certificate-based signature does.
 
 `install.sh`'s certificate step is idempotent (`security find-certificate`
 checked before creating one), so re-running it doesn't create duplicate
