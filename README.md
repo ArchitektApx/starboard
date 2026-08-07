@@ -47,10 +47,16 @@ To have it launch automatically at login: **System Settings → General →
 Login Items & Extensions → + → select Starboard.app**. That's it — no
 script needed for a downloaded build.
 
-Updating to a new release may ask you to re-grant Accessibility, since
-each release is signed differently. See `CLAUDE.md` for the full
-permission/signing model, and for what to do if you also have a
-build-from-source copy installed via `scripts/install.sh`.
+Updating to a new release in place (overwriting the same
+`/Applications/Starboard.app`) needs a fresh Accessibility grant, since
+each release is signed differently — but it may not visibly ask: System
+Settings can keep showing Starboard as already granted while it silently
+isn't, and re-checking that same box doesn't fix it. If Starboard stops
+tracking the Dock after an update, remove the Starboard entry from
+System Settings → Privacy & Security → Accessibility (select it, **−**),
+then relaunch Starboard to get a fresh prompt. See `CLAUDE.md` for why,
+and for what to do if you also have a build-from-source copy installed
+via `scripts/install.sh`.
 
 ## Build from source
 
@@ -97,9 +103,12 @@ losing your place.
 - Accessibility permission (prompted on first launch) — used to read the
   Dock's live position. Starboard still works without it, just pinned to
   a fixed corner instead of hugging the Dock.
-- Currently assumes a bottom-docked Dock on the main display. Left/right
-  Dock placement and multi-monitor setups aren't handled yet — feedback
-  and contributions welcome.
+- Starboard glues itself to the Dock only when it's bottom-anchored, not
+  auto-hidden, and on the main display. Any other configuration — a
+  left/right Dock, auto-hide on, a secondary-display setup — isn't
+  unsupported so much as it falls back automatically to that same fixed
+  corner, and re-glues itself if you switch back. See `CLAUDE.md` for
+  the detection details.
 
 ## Security & trust
 

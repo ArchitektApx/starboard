@@ -1,5 +1,6 @@
 import Cocoa
 import ApplicationServices
+import CoreGraphics
 import CoreText
 import SwiftTerm
 
@@ -22,8 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let fallbackWidth: CGFloat = 300
     private let fallbackHeight: CGFloat = 64
-    private let fallbackMargin: CGFloat = 8
+    private let fallbackRightMargin: CGFloat = 8
     private let cornerRadius: CGFloat = 12
+    /// `com.apple.dock`'s preferences domain -- read directly (not via
+    /// Accessibility) to detect orientation/auto-hide, since both are
+    /// meaningful even before Accessibility permission is granted.
+    private let dockPreferencesDomain = "com.apple.dock" as CFString
     /// Starboard's own panel color — a near-black deep navy, independent of
     /// the Dock's material and whatever's on the desktop behind it. First
     /// pass; tune the RGB/alpha here to taste.
@@ -84,9 +89,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Triggers the system Accessibility permission prompt on first
         // launch if not already granted. Needed to read the Dock's icon
         // tray geometry precisely; falls back to an approximation until
-        // it's granted (see fallbackFrame below).
+        // it's granted (see fallbackFrame below). Result captured (not
+        // discarded) to drive the in-terminal hint fed below.
         let promptOptions = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(promptOptions)
+        let accessibilityTrusted = AXIsProcessTrustedWithOptions(promptOptions)
 
         setUpMainMenu()
 
@@ -155,6 +161,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.orderFrontRegardless()
         panel.makeFirstResponder(terminal)
+
+        // Ad-hoc signing pins the Accessibility grant to this exact
+        // binary's content hash, not the app's path/identifier, so
+        // updating Starboard in place (same /Applications/Starboard.app)
+        // leaves System Settings showing a "Starboard" row that's already
+        // checked on, but silently no longer valid for the new binary --
+        // and re-checking that same box doesn't fix it, only removing
+        // the row and letting a fresh one get created does. Fed directly
+        // into the terminal (bypassing the shell entirely, so it can't be
+        // mistaken for shell output or land in history) since that's the
+        // only UI this menu-bar-less, Dock-icon-less app has to say
+        // anything at all -- there's nowhere else a user would see this.
+        if !accessibilityTrusted {
+            terminal.feed(text: "Starboard: Accessibility isn't granted, so it's pinned to a fixed corner instead of the Dock.\r\n" +
+                "Already shows as granted in System Settings? Remove that entry and re-add Starboard.app --\r\n" +
+                "toggling the checkbox back on won't refresh it after an update.\r\n\r\n")
+        }
 
         // A persistent login shell, not a new Process per command: cd/pwd
         // state survives between commands, same as a normal terminal tab.
@@ -245,12 +268,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// height, same bottom margin (so they sit on one baseline), left edge
     /// touching the Dock's right edge, and its own right edge flush against
     /// the screen's right edge (no margin there at all).
+    ///
+    /// Only ever attempts this for a bottom-anchored Dock on the main
+    /// display, not just because that's the only configuration this has
+    /// been tuned against: a left/right Dock changes which axis the panel
+    /// would need to hug, and a secondary-display Dock lives in a screen
+    /// this code never even looks at. Rather than half-supporting those
+    /// (partial tracking that's subtly wrong is worse than a fixed
+    /// corner), `dockIconTrayFrame` itself returns nil for all of those
+    /// cases -- same fallback path as Accessibility not being granted at
+    /// all -- and `syncFrameToDock`'s existing 1s poll means switching
+    /// Dock settings while Starboard is running re-evaluates this
+    /// automatically, in either direction, without any extra observers.
     private func currentFrame() -> NSRect {
-        guard let screen = NSScreen.main else {
+        guard let screen = mainDisplayScreen() else {
             return NSRect(x: 0, y: 0, width: fallbackWidth, height: fallbackHeight)
         }
 
-        guard let rawDock = dockIconTrayFrame() else {
+        guard let rawDock = dockIconTrayFrame(on: screen) else {
             return fallbackFrame(on: screen)
         }
         // The AXList's box doesn't quite match the Dock's painted chrome
@@ -275,18 +310,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return NSRect(x: x, y: dock.minY, width: width, height: height)
     }
 
-    /// Used before Accessibility permission is granted (or if the Dock's
-    /// AX tree is ever unavailable). The height macOS reserves for the
-    /// Dock is still readable without any special permission, from the gap
-    /// between the screen's full frame and its visible frame — just not
-    /// the Dock's actual width, so this can't touch its right edge.
+    /// Used whenever `dockIconTrayFrame` can't be trusted: Accessibility
+    /// permission not granted, the Dock's AX tree unreadable, a left/right
+    /// Dock, an auto-hiding Dock, or a Dock that isn't on the main
+    /// display. The height macOS reserves for the Dock is still readable
+    /// without any special permission, from the gap between the screen's
+    /// full frame and its visible frame — just not the Dock's actual
+    /// width, so this can't touch its right edge.
     private func fallbackFrame(on screen: NSScreen) -> NSRect {
         let reserved = screen.visibleFrame.minY - screen.frame.minY
         let collapsedHeight = reserved > 4 ? reserved : fallbackHeight
-        let x = screen.frame.maxX - fallbackWidth - fallbackMargin
-        let y = screen.frame.minY + fallbackMargin
+        let x = screen.frame.maxX - fallbackWidth - fallbackRightMargin
+        // Flush with the screen's true bottom edge — the same baseline the
+        // glued panel sits on (dock.minY in currentFrame() also lands right
+        // at the Dock's real bottom margin, a hair above this edge, not
+        // padded away from it). No separate bottom margin here; only the
+        // right edge keeps one, so the panel doesn't touch the screen's
+        // corner.
+        let y = screen.frame.minY
         let height = isExpanded ? screen.visibleFrame.maxY - y : collapsedHeight
         return NSRect(x: x, y: y, width: fallbackWidth, height: height)
+    }
+
+    /// The display hosting the menu bar — i.e. the Dock's home in the
+    /// supported configuration — identified via `CGMainDisplayID()`
+    /// rather than `NSScreen.main`, which tracks whichever screen
+    /// currently has keyboard focus. Using focus here would make this
+    /// panel jump screens as the user works across multiple displays,
+    /// exactly the "jumping" this is meant to avoid. Quartz/Accessibility
+    /// coordinates (used below) are anchored to this display's top-left
+    /// corner regardless of how displays are arranged relative to it.
+    private func mainDisplayScreen() -> NSScreen? {
+        let mainDisplayID = CGMainDisplayID()
+        return NSScreen.screens.first {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == mainDisplayID
+        }
+    }
+
+    /// "bottom", "left", or "right". Absent entirely counts as "bottom":
+    /// the key is only written once the user changes it away from the
+    /// default.
+    private func dockOrientation() -> String {
+        CFPreferencesAppSynchronize(dockPreferencesDomain)
+        return (CFPreferencesCopyAppValue("orientation" as CFString, dockPreferencesDomain) as? String) ?? "bottom"
+    }
+
+    private func dockAutoHides() -> Bool {
+        (CFPreferencesCopyAppValue("autohide" as CFString, dockPreferencesDomain) as? Bool) ?? false
     }
 
     /// Tight bounding box of the Dock's icon tray — the `AXList` child of
@@ -295,9 +365,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// modern macOS that frame spans the entire screen (the Dock process
     /// also hosts desktop wallpaper/icon interaction), which is useless
     /// for positioning. Returns nil if Accessibility permission hasn't
-    /// been granted yet, or the Dock's AX tree can't be read.
-    private func dockIconTrayFrame() -> NSRect? {
-        guard let screen = NSScreen.main else { return nil }
+    /// been granted yet, the Dock's AX tree can't be read, the Dock isn't
+    /// bottom-anchored, it's set to auto-hide, or it isn't on `screen`
+    /// (the main display) at all — any of which means "don't track,
+    /// fall back" to the caller.
+    private func dockIconTrayFrame(on screen: NSScreen) -> NSRect? {
+        guard dockOrientation() == "bottom", !dockAutoHides() else { return nil }
+
         guard let dockApp = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.dock" }) else {
             return nil
         }
@@ -321,10 +395,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        // AX coordinates are Quartz's top-left-origin space; flip to
-        // AppKit's bottom-left-origin space.
+        // AX coordinates are Quartz's top-left-origin space, anchored to
+        // the main display regardless of how displays are arranged; flip
+        // to AppKit's bottom-left-origin space, still relative to that
+        // same origin.
         let flippedY = screen.frame.height - position.y - size.height
-        return NSRect(x: position.x, y: flippedY, width: size.width, height: size.height)
+        let frame = NSRect(x: position.x, y: flippedY, width: size.width, height: size.height)
+        // A Dock on a secondary display would flip to coordinates outside
+        // `screen`'s own bounds, since both are anchored to the main
+        // display's origin — that's the signal it isn't the one Starboard
+        // should be attaching to.
+        guard screen.frame.contains(frame) else { return nil }
+        return frame
     }
 
     private func axRole(of element: AXUIElement) -> String? {

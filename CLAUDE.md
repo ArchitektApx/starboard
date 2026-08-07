@@ -86,8 +86,43 @@ called with the prompt option at launch to trigger the system dialog).
 Until granted — or if the Dock's AX tree is ever unreadable —
 `fallbackFrame(on:)` is used instead: a fixed-width panel in the
 bottom-right corner, with height read from the gap between
-`NSScreen.main.frame` and `.visibleFrame` (which doesn't need any special
-permission, but also can't reveal the Dock's *width*).
+`screen.frame` and `.visibleFrame` (which doesn't need any special
+permission, but also can't reveal the Dock's *width*). Its bottom edge
+sits flush with `screen.frame.minY`, no added margin — deliberately
+matching the glued baseline (`dock.minY`, a hair above that same edge)
+rather than floating an arbitrary margin above it, which read as visibly
+too high before this was tightened.
+
+`dockIconTrayFrame(on:)` also returns nil — same fallback path — for
+three configurations it deliberately doesn't attempt to track, rather
+than tracking them partially or incorrectly:
+- **Left/right Dock** (`dockOrientation()`, reading the `orientation` key
+  from the `com.apple.dock` preferences domain directly — no
+  Accessibility needed for this part). A non-bottom Dock would need the
+  panel hugging a different axis entirely, not a tweak to this logic.
+- **Auto-hide Dock** (`dockAutoHides()`, same domain, `autohide` key).
+  There's no live "Dock is currently shown/hidden" signal to poll
+  cheaply, and gluing to where a hidden Dock *would* be defeats the
+  point of an auto-hidden Dock.
+- **Dock not on the main display.** `mainDisplayScreen()` resolves the
+  display via `CGMainDisplayID()`, not `NSScreen.main` — the latter
+  tracks whichever screen currently has keyboard focus, which would make
+  the panel jump screens as focus moves in a multi-monitor setup, not
+  something a "just sitting there" panel should ever do. AX/Quartz
+  coordinates are anchored to the main display's top-left corner
+  regardless of physical arrangement, so `dockIconTrayFrame` can detect
+  a Dock that isn't there simply by checking whether its flipped frame
+  falls inside `screen.frame` at all (`screen.frame.contains(frame)`);
+  if not, the Dock (and therefore where Starboard would attach) is on a
+  different display, and it falls back instead of attaching to the wrong
+  screen.
+
+Because `currentFrame()` calls `dockIconTrayFrame(on:)` fresh on every
+tick of the existing 1s polling `Timer`, none of the three needs its own
+notification or observer — switching the Dock to the left, turning on
+auto-hide, or reconnecting a display all get picked up on the next tick
+automatically, in either direction, the same way a resized Dock already
+does.
 
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
 default), which is required for spawning a shell process at all.
@@ -169,6 +204,45 @@ now recommends for that path. `install.sh` remains the right tool for
 the build-from-source loop, where the binary (and its ad-hoc signature)
 changes on every rebuild and Login Items won't re-resolve that on its
 own the way the certificate-based signature does.
+
+### Updating a downloaded build in place leaves a stale, silently-broken Accessibility grant
+
+Confirmed by hand (using `scripts/test-release.sh` to simulate a real
+update — rebuild, then overwrite `/Applications/Starboard.app` with the
+new binary at the same path): the previous version's Accessibility grant
+does not carry over, but it also doesn't cleanly disappear or prompt
+fresh either. System Settings keeps showing the same "Starboard" row,
+still checked on, and re-launching Starboard still triggers the "would
+like to control this computer" system alert (i.e. `AXIsProcessTrusted`
+correctly reports false) — but toggling that existing checkbox off and
+back on does **not** fix it; the panel stays pinned to the fallback
+corner. Only removing the row entirely (System Settings' **−** button,
+or `tccutil reset Accessibility com.starboard.app` from a terminal) and
+letting a fresh one get created — either by re-enabling from the prompt
+or adding the app back — actually restores tracking. Root cause: the
+same one behind the `install.sh` gotchas above — ad-hoc signing pins the
+grant to the binary's content hash, not the bundle path/identifier, so
+the stored row's requirement silently no longer matches the new binary
+at that path. A checkbox toggle just flips the existing (mismatched)
+row; it doesn't regenerate the requirement, only deleting-and-recreating
+the row does.
+
+Two places this is handled:
+- `scripts/test-release.sh` runs `tccutil reset Accessibility
+  com.starboard.app` before reopening the freshly built app, so every
+  local test cycle gets a real, working prompt instead of a silently
+  stale one. Scoped to Starboard's own bundle ID only — doesn't touch
+  any other app's grants.
+- `AppDelegate.swift` captures `AXIsProcessTrustedWithOptions`'s return
+  value (previously discarded) and, when false, feeds a short explainer
+  directly into the terminal view via SwiftTerm's `feed(text:)` — before
+  `startProcess` starts the shell, so it can't be mistaken for shell
+  output or land in history. This is the only way to guarantee the fix
+  reaches a real downloaded-release user hitting this after an update,
+  independent of whether they read the README: Starboard has no menu
+  bar, no Dock icon, and no other visible UI to put a hint in, but
+  everyone who hits this *will* be looking at the terminal, wondering
+  why it's not glued to the Dock.
 
 `install.sh`'s certificate step is idempotent (`security find-certificate`
 checked before creating one), so re-running it doesn't create duplicate
