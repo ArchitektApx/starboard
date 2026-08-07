@@ -36,12 +36,12 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
     without it, square corners get painted over the rounded blur.
   - The terminal itself is a [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
     `LocalProcessTerminalView`, started once via
-    `startProcess(executable: "/bin/zsh", args: ["-l"], ...)`. This is a
-    real PTY-backed shell process, not a `Process` spawned per command —
-    that's what makes `cd`, shell history, and arrow-key line editing work
-    across commands instead of resetting each time. The `environment` it's
-    given is explicit, not SwiftTerm's default — see "The child shell's
-    environment" below.
+    `startProcess(executable: Self.shellExecutable, args: ["-l"], environment:
+    Self.childEnvironment(), ...)`. This is a real PTY-backed shell process,
+    not a `Process` spawned per command — that's what makes `cd`, shell
+    history, and arrow-key line editing work across commands instead of
+    resetting each time. The `environment` is explicit, not SwiftTerm's
+    default — see "The child shell's environment" below.
   - `nativeBackgroundColor`/`layer?.backgroundColor` are set to `.clear` on
     the terminal view so the panel's blur shows through behind the text;
     SwiftTerm's Metal renderer is off by default (`useMetalRenderer` starts
