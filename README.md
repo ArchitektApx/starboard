@@ -73,11 +73,28 @@ open /Applications/Starboard.app
 ```
 
 The build is ad-hoc signed, not notarized (notarization needs a paid
-Apple Developer account), so on first launch Gatekeeper will block it —
-open System Settings → Privacy & Security, scroll down, and click **Open
-Anyway** next to the Starboard entry. If you'd rather not click through
-that warning, the source is under 700 lines across 4 Swift files — worth
-reading, and buildable yourself with `swift build` below instead.
+Apple Developer account), so the first launch takes a few more clicks
+than a notarized app would:
+
+1. Opening it is blocked outright ("Starboard" Not Opened) — click Done.
+2. Open System Settings → Privacy & Security, scroll down, and click
+   **Open Anyway** next to the Starboard entry.
+3. A second confirmation dialog appears ("Open Starboard?") — click
+   **Open Anyway** again, then enter your password when prompted.
+4. Starboard launches, but won't be glued to the Dock yet — a separate
+   Accessibility Access prompt appears. Click **Open System Settings**
+   and enable Starboard under Privacy & Security → Accessibility.
+
+If you already have Starboard installed via `scripts/install.sh`, you'll
+see two "Starboard" entries in that Accessibility list — one per build,
+since each is signed differently (see below). They can be hard to tell
+apart, and enabling the new one doesn't always seem to take by itself —
+if it's still not tracking the Dock, remove the older entry (select it,
+click **−**) and re-enable the remaining one.
+
+If you'd rather not click through all of that, the source is under 700
+lines across 4 Swift files — worth reading, and buildable yourself with
+`swift build` below instead.
 
 Each release is signed ad-hoc, and that signature differs between builds,
 so updating to a new version may ask you to re-grant Accessibility
