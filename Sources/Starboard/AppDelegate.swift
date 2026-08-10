@@ -228,7 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !accessibilityTrusted {
             terminal.feed(
                 text:
-                    "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n\r\n"
+                    "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n"
             )
         }
 
