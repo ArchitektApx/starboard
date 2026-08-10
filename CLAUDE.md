@@ -391,37 +391,47 @@ letting AppKit's autoresizing stretch the terminal to fill the new size
 
 ### Expand/collapse
 
-Cmd+E toggles `isExpanded`, growing the panel upward to (almost) full
-screen height for when Dock-height (two rows) isn't enough — e.g. running
-something like Claude Code in there instead of a couple of shell lines.
-Wired through the same hidden `NSMenu` key-equivalent mechanism as
-Copy/Paste/Select All (`setUpMainMenu`) — no visible menu, no button, just
-a key equivalent that resolves via AppKit's menu system regardless of the
-menu never being drawn.
+Cmd+E toggles `isExpanded`, for when Dock-height (two rows) isn't enough —
+e.g. running something like Claude Code in there instead of a couple of
+shell lines. Wired through the same hidden `NSMenu` key-equivalent
+mechanism as Copy/Paste/Select All (`setUpMainMenu`) — no visible menu, no
+button, just a key equivalent that resolves via AppKit's menu system
+regardless of the menu never being drawn.
 
-Growth is upward only: `currentFrame()`'s `x`, width, and bottom `y` stay
-exactly as they are for the collapsed case — still live-tracking the
-Dock — and only the top edge moves, from the Dock's own height up to
-`screen.visibleFrame.maxY`. Deliberately `visibleFrame.maxY`, not
-`frame.maxY`: the menu bar sits at a higher `NSWindowLevel` than this
-panel's `.floating`, so a frame flush with the physical screen top doesn't
-get *clipped* there, it gets *drawn over* — confirmed by testing, with
-`frame.maxY` the top ~1 row of terminal content and the rounded top
-corners were hidden behind the menu bar, not cut off by frame math.
-`visibleFrame.maxY` already excludes the menu bar's reserved strip
-(notch height included) as a matter of what `NSScreen` reports directly —
-no empirical correction constant needed here, unlike
-`dockTopCorrection`/`dockBottomCorrection`, which exist only because
-Accessibility has no equivalent direct answer for the Dock's painted
-chrome.
+Originally (through v0.8.1) this only grew the panel upward to full
+screen height, leaving `x`/width/bottom-`y` exactly as in the collapsed,
+Dock-glued case — only the top edge moved. A Show HN comment
+(2026-08-10) surfaced the flaw: a wide or icon-heavy Dock can leave a
+Dock-to-screen-edge gap only a few characters wide, and since that scheme
+left width completely untouched, expanding did nothing to fix it —
+useless for the exact "run a real CLI agent in here" case `isExpanded`
+exists for.
+
+As of the fix, `currentFrame()` branches to `expandedFrame(on:)` *before*
+touching Dock geometry at all: expanded mode centers the panel within
+`screen.visibleFrame` at `expandedSizeFraction` (0.75) of both width and
+height, fully independent of the Dock's own position/size. Centering was
+chosen over the other option considered — growing left from the Dock's
+right edge to compensate for a narrow gap — because that would mean
+drawing the panel directly over Dock icons while expanded, which breaks
+the "glued companion, never overlapping" character the rest of this file
+holds to even in the collapsed case. Sizing off `visibleFrame` rather than
+`frame` reuses the same trick the old height-only expand relied on:
+`visibleFrame` already excludes the menu bar's reserved strip (notch
+height included), and — as long as the Dock isn't set to auto-hide — the
+Dock's own reserved strip too, so a centered rect sized from it can't
+cover the menu bar above or the Dock below without any extra
+Dock-avoidance math. (Known gap: with an auto-hiding Dock, `visibleFrame`
+doesn't reserve that strip, so the centered box can reach down to where
+the Dock would appear on hover — not addressed, since tracking a
+Dock that hides is already out of scope elsewhere in this file.)
 
 `syncFrameToDock()`'s 1s timer isn't paused while expanded — it keeps
-calling `currentFrame()` every tick regardless, and `currentFrame()`
-itself branches on `isExpanded`, so the panel keeps following the Dock's
-live x-position/baseline even at full height; only which edge is
-Dock-relative (bottom, collapsed) vs. screen-relative (top, expanded)
-changes. Toggling calls `syncFrameToDock()` immediately rather than
-waiting for the next tick.
+calling `currentFrame()` every tick regardless, so a resized or
+reconnected display is still picked up live; there's just no Dock state
+left to track in that branch, since `expandedFrame` never reads the
+Dock's geometry. Toggling calls `syncFrameToDock()` immediately rather
+than waiting for the next tick.
 
 ### Known issue: pasted text briefly renders in wrong foreground color
 

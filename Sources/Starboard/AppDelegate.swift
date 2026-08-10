@@ -16,15 +16,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var terminalView: LocalProcessTerminalView!
     private var trackingTimer: Timer!
     /// Toggled by the hidden Cmd+E menu item. When true, `currentFrame()`
-    /// grows the panel upward to the top of the screen instead of matching
-    /// the Dock's height — the bottom edge (and x/width) still track the
-    /// Dock live, only the top edge changes.
+    /// ignores the Dock entirely and centers the panel within the screen's
+    /// visible area at `expandedSizeFraction` of its width/height —
+    /// collapsing goes back to the Dock-glued frame.
     private var isExpanded = false
 
     private let fallbackWidth: CGFloat = 300
     private let fallbackHeight: CGFloat = 64
     private let fallbackRightMargin: CGFloat = 8
     private let cornerRadius: CGFloat = 12
+    /// Fraction of the screen's visible area (both width and height) the
+    /// panel resizes to when expanded — centered within that area, entirely
+    /// independent of the Dock's own position/size while expanded.
+    private let expandedSizeFraction: CGFloat = 0.75
     /// `com.apple.dock`'s preferences domain -- read directly (not via
     /// Accessibility) to detect orientation/auto-hide, since both are
     /// meaningful even before Accessibility permission is granted.
@@ -296,8 +300,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Cmd+E, resolved the same key-equivalent way as Copy/Paste/Select All
     /// above — reaches here even though the hidden menu is never drawn.
-    /// Flips between the Dock-height default and full screen height, then
-    /// applies immediately rather than waiting for the next tracking tick.
+    /// Flips between the Dock-glued default and a centered, screen-relative
+    /// size, then applies immediately rather than waiting for the next
+    /// tracking tick.
     @objc private func toggleExpanded(_ sender: Any?) {
         isExpanded.toggle()
         syncFrameToDock()
@@ -340,25 +345,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return ceil(ascent + descent + leading)
     }
 
-    /// Sizes and positions the panel as a companion to the Dock: same
-    /// height, same bottom margin (so they sit on one baseline), left edge
-    /// touching the Dock's right edge, and its own right edge flush against
-    /// the screen's right edge (no margin there at all).
+    /// Collapsed: sizes and positions the panel as a companion to the
+    /// Dock — same height, same bottom margin (so they sit on one
+    /// baseline), left edge touching the Dock's right edge, and its own
+    /// right edge flush against the screen's right edge (no margin there
+    /// at all).
     ///
-    /// Only ever attempts this for a bottom-anchored Dock on the main
-    /// display, not just because that's the only configuration this has
-    /// been tuned against: a left/right Dock changes which axis the panel
-    /// would need to hug, and a secondary-display Dock lives in a screen
-    /// this code never even looks at. Rather than half-supporting those
-    /// (partial tracking that's subtly wrong is worse than a fixed
-    /// corner), `dockIconTrayFrame` itself returns nil for all of those
-    /// cases -- same fallback path as Accessibility not being granted at
-    /// all -- and `syncFrameToDock`'s existing 1s poll means switching
-    /// Dock settings while Starboard is running re-evaluates this
+    /// Expanded: ignores the Dock's geometry entirely and centers the
+    /// panel within the screen's visible area instead (see
+    /// `expandedFrame`) — a deliberate choice so expanding never depends
+    /// on how much room a given Dock happens to leave, and never risks
+    /// growing over the Dock itself.
+    ///
+    /// Dock-glued tracking is only ever attempted for a bottom-anchored
+    /// Dock on the main display, not just because that's the only
+    /// configuration this has been tuned against: a left/right Dock changes
+    /// which axis the panel would need to hug, and a secondary-display Dock
+    /// lives in a screen this code never even looks at. Rather than
+    /// half-supporting those (partial tracking that's subtly wrong is worse
+    /// than a fixed corner), `dockIconTrayFrame` itself returns nil for all
+    /// of those cases -- same fallback path as Accessibility not being
+    /// granted at all -- and `syncFrameToDock`'s existing 1s poll means
+    /// switching Dock settings while Starboard is running re-evaluates this
     /// automatically, in either direction, without any extra observers.
     private func currentFrame() -> NSRect {
         guard let screen = mainDisplayScreen() else {
             return NSRect(x: 0, y: 0, width: fallbackWidth, height: fallbackHeight)
+        }
+
+        if isExpanded {
+            return expandedFrame(on: screen)
         }
 
         guard let rawDock = dockIconTrayFrame(on: screen) else {
@@ -374,16 +390,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let x = dock.maxX
         let width = max(screen.frame.maxX - x, 0)
-        // Same bottom edge either way — dock.minY is the shared baseline —
-        // but expanded grows the top edge up to the menu bar instead of
-        // stopping at the Dock's own height. visibleFrame.maxY (not
-        // frame.maxY) is what excludes the menu bar's reserved strip
-        // (including notch height) — frame.maxY is the physical screen
-        // edge, which the menu bar draws over since it sits at a higher
-        // window level than this panel's .floating, not something a frame
-        // that merely stops short of it can avoid.
-        let height = isExpanded ? screen.visibleFrame.maxY - dock.minY : dock.height
-        return NSRect(x: x, y: dock.minY, width: width, height: height)
+        return NSRect(x: x, y: dock.minY, width: width, height: dock.height)
+    }
+
+    /// Centered within the screen's visible area (already excluding the
+    /// menu bar, and the Dock's own reserved strip whenever it isn't set to
+    /// auto-hide) at `expandedSizeFraction` of both dimensions. Deliberately
+    /// independent of `dockIconTrayFrame` — sizing off the Dock-glued frame
+    /// would tie the expanded size to whatever gap a given Dock happens to
+    /// leave (as narrow as a few characters wide behind a large or
+    /// icon-heavy Dock), and growing left to compensate would mean drawing
+    /// directly over the Dock itself. Centering avoids both: expanded size
+    /// is constant regardless of Dock configuration, and never overlaps it.
+    private func expandedFrame(on screen: NSScreen) -> NSRect {
+        let visible = screen.visibleFrame
+        let width = visible.width * expandedSizeFraction
+        let height = visible.height * expandedSizeFraction
+        let x = visible.minX + (visible.width - width) / 2
+        let y = visible.minY + (visible.height - height) / 2
+        return NSRect(x: x, y: y, width: width, height: height)
     }
 
     /// Used whenever `dockIconTrayFrame` can't be trusted: Accessibility
@@ -392,7 +417,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// display. The height macOS reserves for the Dock is still readable
     /// without any special permission, from the gap between the screen's
     /// full frame and its visible frame — just not the Dock's actual
-    /// width, so this can't touch its right edge.
+    /// width, so this can't touch its right edge. Collapsed only —
+    /// `currentFrame()` handles the expanded case itself before ever
+    /// reaching here.
     private func fallbackFrame(on screen: NSScreen) -> NSRect {
         let reserved = screen.visibleFrame.minY - screen.frame.minY
         let collapsedHeight = reserved > 4 ? reserved : fallbackHeight
@@ -404,8 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // right edge keeps one, so the panel doesn't touch the screen's
         // corner.
         let y = screen.frame.minY
-        let height = isExpanded ? screen.visibleFrame.maxY - y : collapsedHeight
-        return NSRect(x: x, y: y, width: fallbackWidth, height: height)
+        return NSRect(x: x, y: y, width: fallbackWidth, height: collapsedHeight)
     }
 
     /// The display hosting the menu bar — i.e. the Dock's home in the
