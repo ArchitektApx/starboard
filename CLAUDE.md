@@ -272,6 +272,36 @@ LaunchAgent's `ProgramArguments` points at
 inherits trust from its Terminal parent — it's specifically the
 persistent, `launchd`-launched instance that needs the signed bundle.
 
+### Homebrew cask
+
+`Casks/starboard.rb` makes this repo usable directly as a Homebrew tap
+(`brew tap palamim/starboard https://github.com/palamim/starboard`, then
+`brew install --cask palamim/starboard/starboard`). It's a self-hosted
+tap rather than a submission to the official `homebrew/cask` repo,
+because that tap now requires notarized casks and Starboard is ad-hoc
+signed only.
+
+`.github/workflows/release.yml`'s existing tag-triggered job rewrites
+the cask's `version` and `sha256` and pushes the change straight to
+`main` on every release tag — so the tap can never point at a stale
+build, and there's no separate manual step to forget. The checksum is
+computed from the `Starboard.zip` already sitting in the runner's
+workspace (from the same job's `Package` step) rather than fetched from
+the GitHub Releases API, since release asset digests are computed there
+asynchronously and may not be ready yet. `checkout` was switched to
+`fetch-depth: 0` for this job because the default shallow clone doesn't
+have `main`'s history available to push onto from a tag build. The
+commit is skipped (not force-pushed, not amended) if the cask is
+already at that version, so re-running the job is a no-op rather than an
+empty commit.
+
+Functionally, `brew upgrade` is just another way of doing the same
+in-place overwrite of `/Applications/Starboard.app` that a manual
+re-download does — so it hits the exact same stale Accessibility grant
+described above, and the cask's `caveats` block repeats the same
+`tccutil reset Accessibility com.starboard.app` fix rather than a
+Homebrew-specific one, since there isn't one.
+
 ### Terminal styling and layout
 
 As of v0.5.3, the panel's color is Starboard's own — a fixed, near-black
