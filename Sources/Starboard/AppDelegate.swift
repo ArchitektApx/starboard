@@ -1,5 +1,5 @@
-import Cocoa
 import ApplicationServices
+import Cocoa
 import CoreGraphics
 import CoreText
 import SwiftTerm
@@ -23,7 +23,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let fallbackWidth: CGFloat = 300
     private let fallbackHeight: CGFloat = 64
-    private let fallbackRightMargin: CGFloat = 8
     private let cornerRadius: CGFloat = 12
     /// Fraction of the screen's visible area (both width and height) the
     /// panel resizes to when expanded — centered within that area, entirely
@@ -84,22 +83,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (e.g. oh-my-zsh), independent of the terminal emulator. First pass;
     /// tune to taste.
     private let starboardAnsiPalette: [Color] = [
-        ansiColor(20, 24, 33),    // black
-        ansiColor(198, 74, 90),   // red — port light
+        ansiColor(20, 24, 33),  // black
+        ansiColor(198, 74, 90),  // red — port light
         ansiColor(79, 157, 105),  // green — starboard light
         ansiColor(196, 154, 62),  // yellow — brass
         ansiColor(58, 124, 165),  // blue — deep ocean
-        ansiColor(133, 110, 168), // magenta — dusk
+        ansiColor(133, 110, 168),  // magenta — dusk
         ansiColor(69, 156, 156),  // cyan — seafoam
-        ansiColor(196, 190, 172), // white — sand
-        ansiColor(75, 87, 99),    // bright black — slate
-        ansiColor(222, 102, 118), // bright red
-        ansiColor(111, 191, 135), // bright green
-        ansiColor(224, 186, 105), // bright yellow
+        ansiColor(196, 190, 172),  // white — sand
+        ansiColor(75, 87, 99),  // bright black — slate
+        ansiColor(222, 102, 118),  // bright red
+        ansiColor(111, 191, 135),  // bright green
+        ansiColor(224, 186, 105),  // bright yellow
         ansiColor(95, 168, 211),  // bright blue
-        ansiColor(169, 143, 201), // bright magenta
-        ansiColor(114, 214, 207), // bright cyan
-        ansiColor(230, 224, 208), // bright white — foam
+        ansiColor(169, 143, 201),  // bright magenta
+        ansiColor(114, 214, 207),  // bright cyan
+        ansiColor(230, 224, 208),  // bright white — foam
     ]
 
     override init() {
@@ -115,7 +114,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // typo here degrades silently rather than failing the build — worth
         // checking the resolved font if the prompt looks wrong.
         let size = Self.terminalFontSize
-        terminalFont = Self.preferredFontNames.lazy.compactMap { NSFont(name: $0, size: size) }.first
+        terminalFont =
+            Self.preferredFontNames.lazy.compactMap { NSFont(name: $0, size: size) }.first
             ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
         super.init()
     }
@@ -126,7 +126,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // tray geometry precisely; falls back to an approximation until
         // it's granted (see fallbackFrame below). Result captured (not
         // discarded) to drive the in-terminal hint fed below.
-        let promptOptions = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+        let promptOptions =
+            [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
         let accessibilityTrusted = AXIsProcessTrustedWithOptions(promptOptions)
 
         setUpMainMenu()
@@ -144,7 +145,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isMovable = false
         // Present on every Space, including full-screen ones, and skip
         // the app switcher / window cycling entirely.
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        panel.collectionBehavior = [
+            .canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle,
+        ]
         panel.hidesOnDeactivate = false
 
         let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: panel.frame.size))
@@ -223,7 +226,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // immediately once the shell starts producing its own output --
         // longer didn't mean clearer, just more of it to scroll back to.
         if !accessibilityTrusted {
-            terminal.feed(text: "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n\r\n")
+            terminal.feed(
+                text:
+                    "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n\r\n"
+            )
         }
 
         // A persistent login shell, not a new Process per command: cd/pwd
@@ -284,16 +290,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
-        appMenu.addItem(withTitle: "Toggle Expanded", action: #selector(toggleExpanded(_:)), keyEquivalent: "e")
-        appMenu.addItem(withTitle: "Quit Starboard", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(
+            withTitle: "Toggle Expanded", action: #selector(toggleExpanded(_:)), keyEquivalent: "e")
+        appMenu.addItem(
+            withTitle: "Quit Starboard", action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q")
 
         let editMenuItem = NSMenuItem()
         mainMenu.addItem(editMenuItem)
         let editMenu = NSMenu(title: "Edit")
         editMenuItem.submenu = editMenu
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(
+            withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(
+            withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         NSApp.mainMenu = mainMenu
     }
@@ -423,7 +434,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func fallbackFrame(on screen: NSScreen) -> NSRect {
         let reserved = screen.visibleFrame.minY - screen.frame.minY
         let collapsedHeight = reserved > 4 ? reserved : fallbackHeight
-        let x = screen.frame.maxX - fallbackWidth - fallbackRightMargin
+        let x = screen.frame.maxX - fallbackWidth
         // Flush with the screen's true bottom edge — the same baseline the
         // glued panel sits on (dock.minY in currentFrame() also lands right
         // at the Dock's real bottom margin, a hair above this edge, not
@@ -445,7 +456,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func mainDisplayScreen() -> NSScreen? {
         let mainDisplayID = CGMainDisplayID()
         return NSScreen.screens.first {
-            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == mainDisplayID
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+                .uint32Value == mainDisplayID
         }
     }
 
@@ -454,7 +466,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// default.
     private func dockOrientation() -> String {
         CFPreferencesAppSynchronize(dockPreferencesDomain)
-        return (CFPreferencesCopyAppValue("orientation" as CFString, dockPreferencesDomain) as? String) ?? "bottom"
+        return
+            (CFPreferencesCopyAppValue("orientation" as CFString, dockPreferencesDomain) as? String)
+            ?? "bottom"
     }
 
     private func dockAutoHides() -> Bool {
@@ -474,15 +488,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func dockIconTrayFrame(on screen: NSScreen) -> NSRect? {
         guard dockOrientation() == "bottom", !dockAutoHides() else { return nil }
 
-        guard let dockApp = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.dock" }) else {
+        guard
+            let dockApp = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleIdentifier == "com.apple.dock"
+            })
+        else {
             return nil
         }
 
         let axApp = AXUIElementCreateApplication(dockApp.processIdentifier)
 
         var childrenRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(axApp, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement]
+        guard
+            AXUIElementCopyAttributeValue(axApp, kAXChildrenAttribute as CFString, &childrenRef)
+                == .success,
+            let children = childrenRef as? [AXUIElement]
         else {
             return nil
         }
@@ -492,7 +512,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         guard let position = axPoint(list, kAXPositionAttribute as CFString),
-              let size = axSize(list, kAXSizeAttribute as CFString)
+            let size = axSize(list, kAXSizeAttribute as CFString)
         else {
             return nil
         }
@@ -513,7 +533,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func axRole(of element: AXUIElement) -> String? {
         var roleRef: AnyObject?
-        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success else {
+        guard
+            AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+                == .success
+        else {
             return nil
         }
         return roleRef as? String
@@ -522,7 +545,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func axPoint(_ element: AXUIElement, _ attribute: CFString) -> CGPoint? {
         var valueRef: AnyObject?
         guard AXUIElementCopyAttributeValue(element, attribute, &valueRef) == .success,
-              let axValue = valueRef
+            let axValue = valueRef
         else {
             return nil
         }
@@ -534,7 +557,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func axSize(_ element: AXUIElement, _ attribute: CFString) -> CGSize? {
         var valueRef: AnyObject?
         guard AXUIElementCopyAttributeValue(element, attribute, &valueRef) == .success,
-              let axValue = valueRef
+            let axValue = valueRef
         else {
             return nil
         }
