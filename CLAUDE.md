@@ -236,6 +236,19 @@ with six conceals in it would log only the first without the exemption.
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
 default), which is required for spawning a shell process at all.
 
+#### Window level
+
+As of v0.9.1, `panel.level` sits one level above the Dock's own window
+level (`kCGDockWindowLevel`, 20) instead of `.floating` (3). `.floating`
+predates Dock tracking entirely and happened to work by coincidence for a
+plain bottom Dock at default size, but it actually sits *below* the
+Dock's real level — so a wide or icon-heavy Dock, or icon magnification
+pushing a hovered icon taller than the Dock's own baseline, painted over
+the panel's edge instead of the reverse. Pre-existing and unrelated to
+the multi-display work above — the Dock's window level doesn't depend on
+which screen it's on, so this applies identically regardless of Dock
+host.
+
 ### Why `scripts/install.sh` packages a `.app` bundle
 
 Confirmed by direct debugging (temporary `FileHandle.standardError` calls
