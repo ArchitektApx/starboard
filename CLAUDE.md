@@ -62,42 +62,47 @@ The panel positions itself as a companion to the Dock — same height, left
 edge touching the Dock's right edge, same bottom margin as the Dock (so
 they share a baseline), and its own right edge flush against the screen's
 right edge, no margin there at all. A repeating `Timer`
-(`dockTrackingInterval`, 1s) recomputes this and
-calls `panel.setFrame` whenever it changes, so it follows the Dock live as
-it's resized or gains/loses icons — there's no notification to observe for
-this, so it's polled.
+(`dockTrackingInterval`, 1s) drives `tick()`
+(`refreshCoarseCaches()` then `runEvaluation()`), which recomputes this
+and calls `panel.setFrame` whenever it changes, so it follows the Dock
+live as it's resized or gains/loses icons — there's no notification to
+observe for that, so it's polled. (Display connect/disconnect *does* have
+a notification — see "Reacting to display changes immediately" below.)
 
-The Dock's geometry comes from `dockIconTrayFrame()`, which reads the
-`AXList` element (the icon row) from the Dock process's accessibility tree
-via `AXUIElementCreateApplication` / `AXUIElementCopyAttributeValue`. This
-is deliberately **not** `CGWindowListCopyWindowInfo`: on modern macOS the
-Dock's own window frame spans the entire screen (the Dock process also
-hosts desktop wallpaper/icon interaction — see the sibling "Wallpaper"
-window owned by the same process), which is useless for positioning. The
-`AXList` box is close but not exact: its bottom edge sits above the Dock's
-real bottom margin, and its top edge overshoots above the Dock's real top
-edge by a smaller amount — Apple doesn't expose the actual painted chrome
-rectangle through Accessibility at all. `dockBottomCorrection` (5pt) and
+The Dock's geometry comes from `dockIconTrayFrame(flippedAgainst:)`, which
+reads the `AXList` element (the icon row) from the Dock process's
+accessibility tree via `AXUIElementCreateApplication` /
+`AXUIElementCopyAttributeValue`. This is deliberately **not**
+`CGWindowListCopyWindowInfo`: on modern macOS the Dock's own window frame
+spans the entire screen (the Dock process also hosts desktop
+wallpaper/icon interaction — see the sibling "Wallpaper" window owned by
+the same process), which is useless for positioning. The `AXList` box is
+close but not exact: its bottom edge sits above the Dock's real bottom
+margin, and its top edge overshoots above the Dock's real top edge by a
+smaller amount — Apple doesn't expose the actual painted chrome rectangle
+through Accessibility at all. `dockBottomCorrection` (5pt) and
 `dockTopCorrection` (5pt) are empirical fixes for that gap, tuned pixel by
 pixel against one real Dock; nudge them if the panel's edges visibly drift
-from the Dock's, e.g. at a very different tile size.
+from the Dock's, e.g. at a very different tile size or a different
+display.
 
 Reading another process's accessibility tree requires the user to grant
 Starboard Accessibility permission (`AXIsProcessTrustedWithOptions` is
 called with the prompt option at launch to trigger the system dialog).
 Until granted — or if the Dock's AX tree is ever unreadable —
 `fallbackFrame(on:)` is used instead: a fixed-width panel in the
-bottom-right corner, with height read from the gap between
-`screen.frame` and `.visibleFrame` (which doesn't need any special
+bottom-right corner of the Dock's *host* screen (see below — not
+necessarily the main display), with height read from the gap between that
+screen's `frame` and `.visibleFrame` (which doesn't need any special
 permission, but also can't reveal the Dock's *width*). Its bottom edge
-sits flush with `screen.frame.minY`, no added margin — deliberately
-matching the glued baseline (`dock.minY`, a hair above that same edge)
-rather than floating an arbitrary margin above it, which read as visibly
-too high before this was tightened.
+sits flush with that screen's bottom edge, no added margin — deliberately
+matching the glued baseline (the tray-derived `minY` in `gluedFrame`, a
+hair above that same edge) rather than floating an arbitrary margin above
+it, which read as visibly too high before this was tightened.
 
-`dockIconTrayFrame(on:)` also returns nil — same fallback path — for
-three configurations it deliberately doesn't attempt to track, rather
-than tracking them partially or incorrectly:
+`dockIconTrayFrame` also returns nil — same fallback path — for two
+configurations it deliberately doesn't attempt to track, rather than
+tracking them partially or incorrectly:
 - **Left/right Dock** (`dockOrientation()`, reading the `orientation` key
   from the `com.apple.dock` preferences domain directly — no
   Accessibility needed for this part). A non-bottom Dock would need the
@@ -105,26 +110,128 @@ than tracking them partially or incorrectly:
 - **Auto-hide Dock** (`dockAutoHides()`, same domain, `autohide` key).
   There's no live "Dock is currently shown/hidden" signal to poll
   cheaply, and gluing to where a hidden Dock *would* be defeats the
-  point of an auto-hidden Dock.
-- **Dock not on the main display.** `mainDisplayScreen()` resolves the
-  display via `CGMainDisplayID()`, not `NSScreen.main` — the latter
-  tracks whichever screen currently has keyboard focus, which would make
-  the panel jump screens as focus moves in a multi-monitor setup, not
-  something a "just sitting there" panel should ever do. AX/Quartz
-  coordinates are anchored to the main display's top-left corner
-  regardless of physical arrangement, so `dockIconTrayFrame` can detect
-  a Dock that isn't there simply by checking whether its flipped frame
-  falls inside `screen.frame` at all (`screen.frame.contains(frame)`);
-  if not, the Dock (and therefore where Starboard would attach) is on a
-  different display, and it falls back instead of attaching to the wrong
-  screen.
+  point of an auto-hidden Dock. (Its *host display* is still tracked,
+  though — only the glued geometry falls back. Coupling the panel to the
+  Dock's own conceal/reveal cycle is tracked as a follow-up, not done
+  here.)
 
-Because `currentFrame()` calls `dockIconTrayFrame(on:)` fresh on every
-tick of the existing 1s polling `Timer`, none of the three needs its own
-notification or observer — switching the Dock to the left, turning on
-auto-hide, or reconnecting a display all get picked up on the next tick
-automatically, in either direction, the same way a resized Dock already
-does.
+#### Following the Dock across displays
+
+Through v0.8.4, tracking only ever worked for a Dock on the main display
+(`CGMainDisplayID()`) — a Dock on any other screen fell back to the fixed
+corner, on whichever screen happened to be main, same as the two
+configurations above. The panel now follows the Dock's actual host
+screen instead.
+
+Two ways `refreshCoarseCaches()` finds that host, tried in order, once a
+second like everything else here:
+1. **`screenReservingBottomStrip()`** — for a fixed (non-auto-hide) Dock,
+   macOS reserves a strip at the bottom of exactly one screen's
+   `visibleFrame`, and that's the Dock's screen. Free: no cross-process
+   call at all, just comparing `NSScreen.screens`' own geometry, so it's
+   what the common case costs.
+2. **`dockWindowHostScreen()`** — used when nothing reserves a strip
+   (mid-transition) or the Dock is set to auto-hide, where nothing ever
+   reserves one. Scans every window (`CGWindowListCopyWindowInfo`) for
+   ones owned by the Dock's process at window layer 20, and reads that
+   window's bounds — which span its *entire* host screen, so they say
+   nothing about icon positions, but they're a reliable, permission-free
+   statement of *which* screen the Dock is on, and stay correct even
+   while the Dock is concealed (exactly when the tray rect can't answer
+   that question at all). Filtered on pid *and* layer 20 rather than pid
+   alone: what was actually measured is that pid alone returned exactly
+   one window on one machine, on one macOS version, and a sibling
+   "Wallpaper" window on the same process is already documented above —
+   a per-display window elsewhere is plausible. Anything other than
+   exactly one match declines to guess (logged via `STARBOARD_DEBUG`, see
+   below) rather than silently resolving the wrong screen, which would be
+   the exact class of bug this exists to fix.
+
+Measured cost of the fallback path: idle CPU over a 120s window, with
+auto-hide off, was equal within noise to the pre-multi-display baseline
+(0.47% of one core vs. 0.49%). With auto-hide on — where the cheap
+bottom-strip check never applies and `dockWindowHostScreen()`'s window-list
+scan runs every tick — it rose from 0.01% to 0.67%. Reported as a known,
+deliberate tradeoff (a scan once a second, only in a configuration that
+already opted out of the free path), not something flagged as a problem
+to fix.
+
+The resolved host feeds `resolveDockPresence()`, which now returns a
+`DockPresence` (`.revealed(tray:host:)` or `.untracked(host:)`) instead of
+a bare optional rect — replacing the old collapsed "did
+`dockIconTrayFrame` return something" question, which couldn't
+distinguish "no Accessibility permission" from "wrong screen" from
+"nothing to glue to yet," and didn't carry a host screen at all for the
+fallback case. `DockPresence.host` is never optional: even a Dock that
+can't be read at all still resolves to a real screen (the cached host, or
+main display, or `NSScreen.screens.first`) before ever reaching
+`fallbackFrame(on:)`, so the fixed-corner fallback lands on the *Dock's*
+screen, not whichever one happens to be main.
+
+Coordinates need one more fix once a second display can host the Dock:
+Accessibility/Quartz coordinates are anchored to the *main* display's
+top-left corner no matter how the displays are physically arranged, so
+`dockIconTrayFrame(flippedAgainst:)` always flips against
+`mainScreen.frame.maxY`, never the host screen's own height — those two
+only agree when the Dock happens to be on the main display, which used to
+be the only case this code ever ran on. (Measured case: a secondary
+display at `y = -212`, `1329pt` tall — flipping against its own height
+instead of the main display's would be off by 111pt, since
+`1440 - 1329 == 111`.) The AXList-vs-real-Dock sanity check moved with it:
+where the old single-screen version rejected a flipped frame that didn't
+land inside *that one* `screen.frame`, `resolveDockPresence()` now checks
+it against `screenHosting(tray)` — every connected screen, centre-point
+first with a greatest-overlap tiebreak for a rect straddling an edge by a
+rounding error — and falls back to `.untracked` if it lands on none of
+them, which is now specifically the stale/garbage-AX-read case, not "this
+Dock is on some other screen" (that's a legitimate, trackable case in its
+own right now).
+
+One more change alongside the multi-display work: the glued panel's width
+now floors at `minPanelWidth` (300pt, same value as `fallbackWidth` on
+purpose — one "narrowest useful panel" number, not two) and grows
+*leftward* over the Dock's rightmost icons rather than shrinking toward
+zero, for a wide or icon-heavy Dock on a narrow display. A couple of
+overlapped icons reads better than an unusable sliver of terminal. Width
+is recomputed from scratch inside `gluedFrame(tray:on:)` on every
+evaluation rather than latched once — if the Dock later shrinks and the
+gap re-widens past 300pt, the panel returns to flush, non-overlapping
+geometry on its own, with nothing to reset.
+
+#### Reacting to display changes immediately
+
+`NSApplication.didChangeScreenParametersNotification` is now observed
+(`screenParametersChanged(_:)`), on top of the 1s poll — added because an
+unplugged/reconfigured display can strand the panel at coordinates that
+no longer exist, and waiting up to a second to notice reads as the app
+hanging. It refreshes the caches and re-evaluates immediately; if the
+panel's *own* current frame no longer intersects any connected screen at
+all, it's re-anchored right away rather than left to the next tick —
+collapsed goes back to the (possibly new) host's glued or fallback frame,
+expanded re-centers on the Dock's host screen specifically (see
+Expand/collapse below for why that differs from the screen an expansion
+normally anchors to).
+
+Left/right Dock and auto-hide still don't get their own notification —
+there's no live signal for either — and stay on the 1s poll, picked up on
+the next `tick()` the same way a resized Dock already is.
+
+#### Diagnosing this remotely
+
+`STARBOARD_DEBUG=1` in the environment gates `debugLog(_:_:)`, which
+writes tagged lines (`state`, `tray`, `dockwindow`, `screens`, `expand`,
+`frame`) to stderr. Left compiled into every build permanently, unlike a
+one-off debugging print: this positions itself off geometry read from
+other processes across whatever display arrangement a user happens to
+have, and "it's 200pt off on one of my monitors" has no answer without
+numbers from that specific machine — re-adding instrumentation after the
+fact means shipping a new build and asking someone to reproduce it again.
+Per-channel repeat suppression (`lastDebugLine`) keeps the once-a-tick
+channels (`state`, `frame`, `tray`) from flooding when nothing's
+changing; transition channels (`expand`, `screens`) are exempt since they
+fire on real events rather than every tick and would otherwise lose
+history — "concealing with the Dock" reads the same every time, so a run
+with six conceals in it would log only the first without the exemption.
 
 No App Sandbox entitlements are set (SPM executables are unsandboxed by
 default), which is required for spawning a shell process at all.
@@ -437,7 +544,7 @@ left width completely untouched, expanding did nothing to fix it —
 useless for the exact "run a real CLI agent in here" case `isExpanded`
 exists for.
 
-As of the fix, `currentFrame()` branches to `expandedFrame(on:)` *before*
+As of the fix, `frame(for:)` branches to `expandedFrame(on:)` *before*
 touching Dock geometry at all: expanded mode centers the panel within
 `screen.visibleFrame` at `expandedSizeFraction` (0.75) of both width and
 height, fully independent of the Dock's own position/size. Centering was
@@ -456,11 +563,29 @@ doesn't reserve that strip, so the centered box can reach down to where
 the Dock would appear on hover — not addressed, since tracking a
 Dock that hides is already out of scope elsewhere in this file.)
 
-`syncFrameToDock()`'s 1s timer isn't paused while expanded — it keeps
-calling `currentFrame()` every tick regardless, so a resized or
-reconnected display is still picked up live; there's just no Dock state
-left to track in that branch, since `expandedFrame` never reads the
-Dock's geometry. Toggling calls `syncFrameToDock()` immediately rather
+As of the multi-display rework, which screen an expansion centers *on* is
+no longer always the Dock's host. It's captured once, as a display ID
+rather than a cached `NSScreen` — screen objects go stale and keep
+reporting their old frame after a reconfiguration, which a raw cached
+reference would silently re-center onto — via
+`expansionScreen(fallingBackTo:)`: the screen the panel is currently
+sitting on (`panel.screen`), then the one its frame overlaps most, then
+the Dock's host, then main. Deliberately the panel's *own* screen first,
+not the Dock's: those routinely differ once the panel can live on a
+non-main display, and centering a freshly-expanded panel on the Dock's
+host would throw a window the user is actively typing in onto a
+different monitor than the one they're looking at. The one exception is
+`screenParametersChanged`'s stranded-panel case (see "Reacting to display
+changes immediately" above): if the screen an expanded panel was actually
+on just disappeared, there's no "own screen" left to prefer, so that path
+re-centers on the Dock's host specifically, as the least-arbitrary screen
+still connected.
+
+`tick()`'s 1s timer isn't paused while expanded — it keeps calling
+`runEvaluation()` every tick regardless, so a resized or reconnected
+display is still picked up live; there's just no Dock state left to track
+in that branch, since `expandedFrame` never reads the Dock's geometry.
+Toggling calls `refreshCoarseCaches()` and applies immediately rather
 than waiting for the next tick.
 
 ### Known issue: pasted text briefly renders in wrong foreground color

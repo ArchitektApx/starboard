@@ -124,12 +124,13 @@ losing your place.
 - Accessibility permission (prompted on first launch) — used to read the
   Dock's live position. Starboard still works without it, just pinned to
   a fixed corner instead of hugging the Dock.
-- Starboard glues itself to the Dock only when it's bottom-anchored, not
-  auto-hidden, and on the main display. Any other configuration — a
-  left/right Dock, auto-hide on, a secondary-display setup — isn't
-  unsupported so much as it falls back automatically to that same fixed
-  corner, and re-glues itself if you switch back. See `CLAUDE.md` for
-  the detection details.
+- Starboard follows the Dock across displays — move it to another
+  monitor and Starboard re-glues itself there within a second. It only
+  glues itself when the Dock is bottom-anchored and not auto-hidden; a
+  left/right Dock or auto-hide isn't unsupported so much as it falls
+  back automatically to a fixed corner (still on the Dock's own screen),
+  and re-glues itself if you switch back. See `CLAUDE.md` for the
+  detection details.
 
 ## Security & trust
 
