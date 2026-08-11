@@ -184,7 +184,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        panel.level = .floating
+        // `.floating` (level 3) sits below the Dock's own window
+        // (`kCGDockWindowLevel`, 20), so a wide or icon-heavy Dock -- or
+        // icon magnification pushing an icon taller than the Dock's own
+        // baseline -- painted over the panel's edge instead of the
+        // reverse. One level above the Dock's real level keeps the
+        // companion panel in front of it, the way it visually reads as
+        // sitting next to the Dock rather than behind it.
+        panel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 1)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
