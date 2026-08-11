@@ -220,16 +220,18 @@ the next `tick()` the same way a resized Dock already is.
 
 `STARBOARD_DEBUG=1` in the environment gates `debugLog(_:_:)`, which
 writes tagged lines (`state`, `tray`, `dockwindow`, `screens`, `expand`,
-`frame`) to stderr. Left compiled into every build permanently, unlike a
-one-off debugging print: this positions itself off geometry read from
-other processes across whatever display arrangement a user happens to
-have, and "it's 200pt off on one of my monitors" has no answer without
-numbers from that specific machine — re-adding instrumentation after the
-fact means shipping a new build and asking someone to reproduce it again.
-Per-channel repeat suppression (`lastDebugLine`) keeps the once-a-tick
-channels (`state`, `frame`, `tray`) from flooding when nothing's
-changing; transition channels (`expand`, `screens`) are exempt since they
-fire on real events rather than every tick and would otherwise lose
+`frame`, `verdict`, `visibility`, `timer` — the last three added for
+auto-hide coupling, see below) to stderr. Left compiled into every build
+permanently, unlike a one-off debugging print: this positions itself off
+geometry read from other processes across whatever display arrangement a
+user happens to have, and "it's 200pt off on one of my monitors" has no
+answer without numbers from that specific machine — re-adding
+instrumentation after the fact means shipping a new build and asking
+someone to reproduce it again. Per-channel repeat suppression
+(`lastDebugLine`) keeps the once-a-tick channels (`state`, `frame`,
+`tray`, `verdict`) from flooding when nothing's changing; transition
+channels (`expand`, `screens`, `visibility`, `timer`) are exempt since
+they fire on real events rather than every tick and would otherwise lose
 history — "concealing with the Dock" reads the same every time, so a run
 with six conceals in it would log only the first without the exemption.
 
@@ -600,6 +602,142 @@ display is still picked up live; there's just no Dock state left to track
 in that branch, since `expandedFrame` never reads the Dock's geometry.
 Toggling calls `refreshCoarseCaches()` and applies immediately rather
 than waiting for the next tick.
+
+### Auto-hide coupling
+
+Through v0.9.1, an auto-hiding Dock's *host display* was tracked (see
+above) but its glued *geometry* still fell back to the fixed corner
+permanently — Starboard never noticed the Dock concealing or revealing at
+all, so the panel just sat there, always visible, regardless of what the
+Dock was doing. As of the auto-hide coupling work, the panel conceals and
+reveals together with an auto-hiding Dock, except while it's demonstrably
+in use (the key window, or expanded), in which case it holds in place
+rather than vanishing or following the Dock off screen.
+
+#### Telling concealed from revealed
+
+`DockPresence` gained a third case, `.concealed(host:)`, alongside
+`.revealed` and `.untracked`. With auto-hide on, `resolveDockPresence()`
+reads the tray rect the same way it always has, then asks
+`screenHosting(tray)` whether that rect lands on any connected screen at
+all: if it doesn't, that *is* the concealed state (a fully concealed tray
+sits entirely below its host's bottom edge), not a bad read to discard.
+This deliberately overloads the same "off screen" signal the old
+fixed-Dock code treated as a stale/garbage AX read to fall back from —
+with auto-hide on, there's nothing to distinguish the two, and the
+concealed reading is the one that self-corrects (gone by the next tick,
+at most ~0.96s away and usually 60ms) where treating a concealed Dock as
+untracked would park the panel on screen indefinitely.
+
+For a tray that *does* land on a screen, `tray.maxY <= host.frame.minY +
+1` decides concealed vs. revealed — measured on three displays including
+one at y = -212: a fully concealed tray lands exactly on `host.frame.minY`
+every time, while the earliest partially-revealed sample already clears
+it by 8pt and a settled reveal by 82-83pt, so the 1pt tolerance absorbs
+rounding without ever swallowing a real reveal.
+
+#### Dual-cadence tracking
+
+`tick()` no longer always runs a full evaluation. With auto-hide off (the
+common case), nothing changed — every tick is a full evaluation on
+`dockTrackingInterval` (1s), same as always, and idle CPU is equal within
+noise to before (0.47% of one core vs. 0.49%). With auto-hide on, the
+timer instead runs at `fastTrackingInterval` (60ms), and only every
+`coarseTickRatio`-th tick (16, so ~0.96s) is a full evaluation; the ticks
+between are cheap and in-process, deciding whether a reveal is even
+plausible before ever paying for an Accessibility read. `startTrackingTimer()`
+retimes the actual `Timer` between the two cadences whenever
+`cachedDockAutoHides` changes, rather than always running fast and
+returning early — a Dock that never conceals has no reveal latency to
+improve, so waking 16 times a second to do nothing would be pure cost in
+the most common configuration there is. Measured cost of running fast:
+0.6-0.7% of one core sampled live, 0.3% as a lifetime average over 7m47s
+idle with the Dock auto-hiding.
+
+A fast tick only reaches a full evaluation if `isArmed()` says a reveal is
+plausible: the panel is already visible (keeps a *conceal* responsive
+after the pointer has left, not just a reveal), or the pointer sits within
+`armingEdgeStrip` (4pt) of any screen's bottom edge — poking that strip is
+what reveals an auto-hiding Dock, so it's the cheapest available
+predictor. Known, accepted gap: revealing the Dock via keyboard access
+(Ctrl+F3) without moving the pointer at all isn't caught by this, and
+waits for the next coarse tick (~1s) instead of ~100ms.
+
+#### Holding a panel that's in use
+
+The panel's own visibility now depends on Dock presence: `.concealed`
+orders it out (not `alphaValue = 0` — an invisible-but-present panel would
+still be a focusable click target silently swallowing input); `.revealed`
+and `.untracked` order it back in. But a panel that's the key window or
+expanded (`exempt`, in `evaluate(_:)`) must never vanish or get yanked
+mid-keystroke, so that case freezes (`isFrozen = true`) instead of
+following the Dock, both while genuinely concealed and mid-conceal (the
+tray clears `.revealed` for most of a ~250ms conceal slide, so at a 60ms
+cadence several ticks would otherwise glue the panel to a tray already
+partway off screen).
+
+`isFrozen` needs to tell a conceal from a reveal apart, and can't from the
+raw tray rect alone — it's one rigid rect translating vertically, so a
+reveal's not-yet-caught-up bottom edge produces the exact same
+`tray.minY < host.frame.minY` reading a conceal's does. `wasConcealed`
+(whether the last evaluated presence was `.concealed`) is what
+disambiguates them: without it, simply moving the pointer down to reveal
+the Dock while the panel happened to be focused or expanded would freeze
+it as though the Dock were leaving, when it was arriving. A confirmed
+mid-reveal doesn't freeze, but doesn't glue live either — it waits for the
+tray to fully settle rather than chasing a still partially-off-screen
+rect in.
+
+A held panel clears its own freeze once it has nothing left to hold
+for: not mid-slide in either direction, and either not exempt anymore or
+settled on the *same* display it was already on. This is re-derived fresh
+on every coarse tick regardless of hold state (the fast path skips
+evaluating a held panel entirely, for cost, but the ~1s coarse path never
+does), which is what lets an expanded session that survives a full
+conceal/reveal cycle resolve on its own instead of latching held until
+the next Cmd+E. The one case that doesn't clear on its own: a Dock that
+reveals on a *different* display than the one the panel is held on. A
+migrated Dock reappearing elsewhere still can't be allowed to yank a
+focused panel onto a new monitor — that stays held until exemption ends
+or an explicit Cmd+E collapse.
+
+`restoreLastFullyVisibleFrameIfStranded(on:)` is the rescue for a panel
+caught mid-slide the instant it becomes exempt (the user clicks in while
+the Dock is already partway through concealing): it's frozen at whatever
+frame was last applied, which — since a non-exempt panel tracks the
+conceal live — can hang off the bottom of the screen. Put back on
+`collapsedFrame`, the last frame that was fully on screen, so freezing can
+never leave a focused panel partly or wholly invisible.
+
+#### Collapsing a held panel
+
+`collapseTarget(for:)` decides where Cmd+E lands when collapsing. A
+*held* panel (frozen, or the freshly-resolved presence is `.concealed`
+even before `isFrozen` catches up — there's no glued geometry to compute
+in that state anyway) replays `collapsedFrame`, the last collapsed frame
+that was actually applied, rather than computing fresh geometry: the Dock
+isn't in a state fresh geometry could trust. Anything else computes fresh
+geometry from the current presence, deliberately — collapsing onto a Dock
+that was resized or migrated while the panel was expanded must land on
+the Dock as it is now, not as it was. `collapsedFrame` is maintained
+continuously (in `applyFrame`, whenever the applied frame is a collapsed
+one fully on some screen) rather than snapshotted at the moment of
+expansion, since an expanded-but-unfrozen panel keeps getting evaluated
+every tick and a snapshot would be stale long before any freeze began.
+Off-screen frames are deliberately never remembered this way, so a later
+held collapse can't replay one.
+
+#### Launching concealed
+
+With an auto-hiding Dock, Starboard now launches concealed rather than
+showing the panel for a moment and immediately hiding it again — a timed
+"visible for the first few seconds" grace period is a state that exists
+once per launch and lies exactly when someone is trying to work out why
+nothing appeared. The terminal and its shell are still fully set up
+either way, so the panel is ready the instant the Dock reveals. This
+depends on the very first `resolveDockPresence()` read at launch being
+correct; a misclassified read leaves the panel invisible until the next
+coarse tick corrects it (see the Watch item below).
 
 ### Watch item: auto-hide coupling edge cases (PR #7)
 

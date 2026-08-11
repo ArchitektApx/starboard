@@ -125,12 +125,13 @@ losing your place.
   Dock's live position. Starboard still works without it, just pinned to
   a fixed corner instead of hugging the Dock.
 - Starboard follows the Dock across displays — move it to another
-  monitor and Starboard re-glues itself there within a second. It only
-  glues itself when the Dock is bottom-anchored and not auto-hidden; a
-  left/right Dock or auto-hide isn't unsupported so much as it falls
-  back automatically to a fixed corner (still on the Dock's own screen),
-  and re-glues itself if you switch back. See `CLAUDE.md` for the
-  detection details.
+  monitor and Starboard re-glues itself there within a second. With an
+  auto-hiding Dock, it conceals and reveals right along with it, except
+  while you're actively using it (typing into it, or expanded), so it
+  never vanishes or gets yanked out from under you mid-keystroke. Only a
+  left/right Dock stays unsupported — it falls back to a fixed corner on
+  the Dock's own screen instead. See `CLAUDE.md` for the detection
+  details.
 
 ## Security & trust
 
