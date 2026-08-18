@@ -138,14 +138,30 @@ extension AppDelegate {
         applyFrame(remembered)
     }
 
-    func applyFrame(_ frame: NSRect) {
+    func applyFrame(_ frame: NSRect, animated: Bool = false) {
         if !isExpanded, NSScreen.screens.contains(where: { $0.frame.contains(frame) }) {
             collapsedFrame = frame
         }
         guard panel.frame != frame else { return }
         debugLog("frame", "\(frame)")
-        panel.setFrame(frame, display: true)
-        terminalView.frame = TerminalLayout.contentFrame(in: NSRect(origin: .zero, size: frame.size))
+
+        let layoutTerminal = {
+            self.terminalView.frame = TerminalLayout.contentFrame(
+                in: NSRect(origin: .zero, size: frame.size))
+        }
+
+        guard animated else {
+            panel.setFrame(frame, display: true)
+            layoutTerminal()
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup(
+            { context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(frame, display: true)
+            }, completionHandler: layoutTerminal)
     }
 
     func collapseTarget(for presence: DockPresence?) -> NSRect {

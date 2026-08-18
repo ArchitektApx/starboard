@@ -38,13 +38,13 @@ extension AppDelegate {
         if isExpanded {
             isExpanded = false
             expansionScreenID = nil
-            applyFrame(collapseTarget(for: presence))
+            applyFrame(collapseTarget(for: presence), animated: true)
         } else {
             isExpanded = true
             let screen = expansionScreen(fallingBackTo: presence?.host)
             expansionScreenID = screen.flatMap(displayID(of:))
             if let screen {
-                applyFrame(expandedFrame(on: screen))
+                applyFrame(expandedFrame(on: screen), animated: true)
             }
         }
         debugLog("expand", "isExpanded=\(isExpanded) screen=\(describe(expansionScreenID))")
