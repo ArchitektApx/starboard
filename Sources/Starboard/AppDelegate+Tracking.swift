@@ -1,3 +1,4 @@
+import ApplicationServices
 import Cocoa
 
 extension AppDelegate {
@@ -47,6 +48,15 @@ extension AppDelegate {
     }
 
     func refreshCoarseCaches() {
+        let nowTrusted = AXIsProcessTrusted()
+        if nowTrusted != accessibilityTrusted {
+            accessibilityTrusted = nowTrusted
+            if !nowTrusted {
+                hintDismissed = false
+                installFallbackHintIfNeeded()
+            }
+        }
+
         cachedDockOrientation = dockOrientation()
         cachedDockAutoHides = dockAutoHides()
 

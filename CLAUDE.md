@@ -57,6 +57,18 @@ purpose for a future session, not dead code to clean up.
   tools that branch on it (e.g. ngrok's zsh completion emitting bash
   syntax). `ShellEnvironment` sets it explicitly — don't pass `nil` for
   `startProcess`'s `environment`.
+- **`accessibilityTrusted` is re-checked once per second in
+  `refreshCoarseCaches`, not just at launch** — `AXIsProcessTrusted()` was
+  originally only called in `applicationDidFinishLaunching`, so revoking
+  the grant while Starboard was already running (as opposed to before
+  launching it) never got noticed: the fallback hint panel is only ever
+  *created* inside the `!accessibilityTrusted` branch, so a session that
+  launched trusted would never allocate it no matter what happened to the
+  grant afterward. `refreshCoarseCaches` runs on the same ~1s cadence as
+  the rest of the coarse Dock-state refresh regardless of auto-hide, so
+  piggybacking the trust check there catches both directions (revoke
+  mid-session now surfaces the hint; grant mid-session now dismisses it)
+  without adding a second timer.
 - The Homebrew tap (`Casks/starboard.rb`) is self-hosted, not submitted to
   `homebrew/cask`, because that tap requires notarization and Starboard is
   ad-hoc signed only. `.github/workflows/release.yml` updates the cask's
