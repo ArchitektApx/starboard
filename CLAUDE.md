@@ -21,9 +21,10 @@ Plain SPM executable, no Xcode project, no Info.plist — `main.swift` sets
 `.accessory` activation policy directly instead. `AppDelegate`'s behavior
 is split across `AppDelegate+*.swift` extensions by concern (menu,
 Dock-tracking state machine, Dock-relative geometry, screen resolution,
-Dock Accessibility reads, debug logging); `DockPresence`, `PanelBuilder`,
-`TerminalTheme`, `TerminalLayout`, and `ShellEnvironment` are standalone.
-Read the code for how it works — it's small and the names are literal.
+Dock Accessibility reads, debug logging, theme switching); `DockPresence`,
+`PanelBuilder`, `TerminalTheme`, `Theme`, `ThemePickerView`,
+`TerminalLayout`, and `ShellEnvironment` are standalone. Read the code
+for how it works — it's small and the names are literal.
 
 ## Non-obvious gotchas (not discoverable by reading the code)
 
@@ -52,6 +53,20 @@ Read the code for how it works — it's small and the names are literal.
   `homebrew/cask`, because that tap requires notarization and Starboard is
   ad-hoc signed only. `.github/workflows/release.yml` updates the cask's
   version/sha256 automatically on every tag push.
+- **Starboard's own menu bar never actually appears** — `.accessory` apps
+  only get their menu bar shown while active, and the panel is a
+  `.nonactivatingPanel` that never makes the app active. A visible
+  clickable "Theme" submenu was tried and was permanently unreachable.
+  Menu key equivalents (Cmd+E, Cmd+T, Cmd+Q) still work regardless,
+  because `NSApplication` matches them against the responder chain
+  independent of menu-bar visibility — so any future menu-driven feature
+  needs a keyboard shortcut, not a clickable item, to actually be usable.
+- **The theme picker is its own floating panel, not a subview of the main
+  one.** The main panel is only as tall as the Dock's icon tray when
+  collapsed (often well under 100pt), and a subview can never draw
+  outside its own window's frame — no clipping-mask trick fixes that.
+  The picker anchors to the main panel's bottom edge and grows upward
+  in screen coordinates instead.
 
 ## Known open items
 

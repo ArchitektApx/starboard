@@ -18,9 +18,12 @@ first place.
   focus from whatever app you're in.
 - A real, persistent shell (`zsh -l`) — `cd`, history, and state carry
   over between commands, not a one-shot command runner.
-- Its own dark look and a muted, nautical ANSI color palette.
+- Its own dark look and a muted, nautical ANSI color palette by default,
+  with Nebula, Terminal Green, Dracula, and Nord to switch between.
 - Cmd+E expands it to full screen height for when Dock-height isn't
   enough, then Cmd+E again to snap back.
+- Cmd+T pops up a theme picker — ↑/↓ to pick, Enter to apply, Esc to
+  cancel.
 
 ## Download
 
@@ -136,8 +139,9 @@ losing your place.
 ## Security & trust
 
 Starboard makes no network requests and collects no data — there's
-nothing in the source that could, since it's under 700 lines across 4
-Swift files, worth reading yourself rather than taking on faith. The one
+nothing in the source that could, since it's just over 1,000 lines
+across 17 Swift files, worth reading yourself rather than taking on
+faith. The one
 sensitive-looking permission it asks for, Accessibility, is used for
 exactly one thing: reading the Dock's on-screen position so the panel can
 sit next to it.
