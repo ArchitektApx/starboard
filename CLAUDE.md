@@ -14,7 +14,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 Plain Swift Package Manager executable target (`Starboard`), no Xcode
-project, no Info.plist. Three files in `Sources/Starboard/`:
+project, no Info.plist. No comments anywhere in `Sources/Starboard/` — the
+"why" behind everything lives in this file instead, so treat it as the
+authoritative record when a symbol's purpose isn't obvious from its name.
+Files in `Sources/Starboard/`:
 
 - `main.swift` — entry point. Creates `NSApplication.shared`, sets the
   delegate, and calls `app.setActivationPolicy(.accessory)` *before*
@@ -27,17 +30,49 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
   `.nonactivatingPanel` is what lets the terminal view become key *without*
   activating the app or stealing focus from whatever app the user is
   currently in.
-- `AppDelegate.swift` — everything else: builds the panel, tracks the Dock
-  to size/position it, and wires up the terminal.
+- `AppDelegate.swift` — the `AppDelegate` class itself: every stored
+  property (panel/terminal references, the expand/freeze/conceal state
+  machine's mutable state, the coarse-cadence caches) plus
+  `applicationDidFinishLaunching`, which orchestrates startup — prompt for
+  Accessibility, build the initial Dock-relative frame, build the panel via
+  `PanelBuilder`, feed the Accessibility hint if needed, start the shell,
+  start the tracking timer, register for screen-change notifications — in
+  that order. The rest of `AppDelegate`'s behavior lives in same-module
+  extensions, one file per concern, all internal (not `private`) since they
+  need to see each other's members across files:
+  - `AppDelegate+Menu.swift` — the hidden main menu and Cmd+E's
+    `toggleExpanded(_:)`.
+  - `AppDelegate+Tracking.swift` — the polling timer (`tick`), the
+    dual-cadence coarse/fast split, the `evaluate(_:)` state machine that
+    freezes/thaws/conceals the panel, and `applyFrame`/`collapseTarget`.
+  - `AppDelegate+DockGeometry.swift` — turns a `DockPresence` into an
+    `NSRect`: `resolveDockPresence`, `gluedFrame`, `expandedFrame`,
+    `fallbackFrame`, and their tuning constants (`fallbackWidth`,
+    `dockBottomCorrection`, `expandedSizeFraction`, etc).
+  - `AppDelegate+ScreenResolution.swift` — which `NSScreen` something
+    belongs to: `mainDisplayScreen`, `screenHosting`, `dockWindowHostScreen`.
+  - `AppDelegate+DockAccessibility.swift` — the `com.apple.dock`
+    preferences reads (`dockOrientation`, `dockAutoHides`) and the
+    Accessibility-API tray read (`dockIconTrayFrame`, the `ax*` helpers).
+  - `AppDelegate+Debug.swift` — `debugLog`, gated on `STARBOARD_DEBUG`.
+- `DockPresence.swift` — the `revealed`/`concealed`/`untracked` enum
+  described below. Top-level rather than nested in `AppDelegate`, since
+  every extension file above needs to name it.
+- `PanelBuilder.swift` — constructs the `NSPanel`, its blur/tint layers, and
+  the `LocalProcessTerminalView`, returning both to
+  `applicationDidFinishLaunching`. Pulled out of that function specifically
+  because it's pure view construction with no Dock-tracking logic in it.
   - The panel's `collectionBehavior` includes `.canJoinAllSpaces` and
     `.fullScreenAuxiliary` so it stays visible across every Space, including
     over full-screen apps. `effectView.layer?.masksToBounds = true` clips
     the (edge-to-edge) terminal view to the panel's rounded corners —
     without it, square corners get painted over the rounded blur.
   - The terminal itself is a [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)
-    `LocalProcessTerminalView`, started once via
-    `startProcess(executable: Self.shellExecutable, args: ["-l"], environment:
-    Self.childEnvironment(), ...)`. This is a real PTY-backed shell process,
+    `LocalProcessTerminalView`, started (back in `AppDelegate.swift`, once
+    `PanelBuilder` has returned it) via
+    `startProcess(executable: ShellEnvironment.executable, args: ["-l"],
+    environment: ShellEnvironment.variables(), ...)`. This is a real
+    PTY-backed shell process,
     not a `Process` spawned per command — that's what makes `cd`, shell
     history, and arrow-key line editing work across commands instead of
     resetting each time. The `environment` is explicit, not SwiftTerm's
@@ -55,6 +90,19 @@ project, no Info.plist. Three files in `Sources/Starboard/`:
     `copy(_:)`/`paste(_:)`/`selectAll(_:)` via AppKit's menu-key-equivalent
     system, so without *some* main menu those keystrokes go nowhere,
     silently, regardless of whether it's ever drawn on screen.
+- `TerminalTheme.swift` — the constant visual identity: font resolution
+  (`font`, `fontSize`, `preferredFontNames`), `panelTintColor`,
+  `cornerRadius`, `padding`, and the ANSI palette (`ansiPalette`, via the
+  private `ansiColor` helper). All `static let`, so `font` — the old
+  `terminalFont`, previously computed once in `AppDelegate.init()` — is now
+  resolved lazily on first access instead; `AppDelegate` no longer needs
+  its own `init()` at all.
+- `TerminalLayout.swift` — `contentFrame(in:)` and `estimatedCellHeight(for:)`,
+  the padding/centering math described under "The child shell's
+  environment" below (old name: `terminalContentFrame(in:)`).
+- `ShellEnvironment.swift` — `executable` (`/bin/zsh`) and `variables()`,
+  described under "The child shell's environment" below (old names:
+  `shellExecutable` and `childEnvironment()`).
 
 ### Dock tracking
 
@@ -427,10 +475,10 @@ Homebrew-specific one, since there isn't one.
 ### Terminal styling and layout
 
 As of v0.5.3, the panel's color is Starboard's own — a fixed, near-black
-`panelTintColor` layered as a plain `NSView` between the `NSVisualEffectView`
-blur and the terminal content, not a match for the Dock's own chrome. Dock
-tracking (`syncFrameToDock`/`dockIconTrayFrame`) still governs the panel's
-*height and position* only. Color was deliberately decoupled: the Dock's
+`TerminalTheme.panelTintColor` layered as a plain `NSView` between the
+`NSVisualEffectView` blur and the terminal content, not a match for the
+Dock's own chrome. Dock tracking (`applyFrame`/`dockIconTrayFrame`) still
+governs the panel's *height and position* only. Color was deliberately decoupled: the Dock's
 translucency is a private, OS-version-tuned WindowServer recipe (not a
 public `NSVisualEffectView.Material`), and both it and Starboard's previous
 `.menu` material use `blendingMode = .behindWindow` — i.e. both react live
@@ -444,7 +492,7 @@ tune `panelTintColor`'s RGB/alpha directly rather than trying to sample
 or approximate the Dock's material.
 
 As of v0.5.4, the 16 ANSI colors are also Starboard's own
-(`starboardAnsiPalette`, installed via `terminal.installColors(_:)` —
+(`TerminalTheme.ansiPalette`, installed via `terminal.installColors(_:)` —
 SwiftTerm's public wrapper around `Terminal.installPalette`, which needs
 exactly 16 `Color` entries) — muted ocean blues/teals instead of harsh
 primaries, with red/green nodding to a ship's port/starboard navigation
@@ -481,24 +529,23 @@ Note that `NSFont(name:)` returns nil for a name that isn't installed, so
 a typo in that list fails silently rather than at build time — if the
 prompt looks wrong, check which entry actually resolved.
 
-`terminalFontSize` is `static` so `init()` can read it while initializing
-`terminalFont`; Swift forbids touching `self` before every stored property
-is set, which is why the size was previously duplicated as a literal in
-`init()` while the property itself went unused. `terminalFont` is computed
-once in `AppDelegate.init()` rather than per-launch, since it's reused by
-both the initial layout and every subsequent resize.
+`TerminalTheme.font` is a `static let`, resolved once (Swift static
+properties are lazy and initialized at most once) rather than per-launch,
+since it's reused by both the initial layout and every subsequent resize —
+this replaced an `AppDelegate.init()` that used to compute the same thing
+into an instance property; `AppDelegate` has no `init()` anymore.
 
-Changing the font family changes the row count. `terminalContentFrame`
+Changing the font family changes the row count. `TerminalLayout.contentFrame`
 derives rows as `floor(usableHeight / cellHeight)` from
 `estimatedCellHeight`, and Nerd Font patching raises a font's vertical
 metrics — enough that a Dock-height panel tuned to two rows with Menlo can
-land on one. `terminalFontSize` (11pt) and `terminalPadding` (8pt) are the
-knobs; drop either a point if that happens.
+land on one. `TerminalTheme.fontSize` (11pt) and `TerminalTheme.padding`
+(8pt) are the knobs; drop either a point if that happens.
 
 ### The child shell's environment
 
 `startProcess` is passed an explicit `environment` from
-`childEnvironment()` rather than `nil`. Passing `nil` makes SwiftTerm fall
+`ShellEnvironment.variables()` rather than `nil`. Passing `nil` makes SwiftTerm fall
 back to `Terminal.getEnvironmentVariables()`, which is a deliberately
 minimal allowlist — `TERM`, a hardcoded UTF-8 `LANG`, and a handful of
 user identity variables — and notably has no `SHELL`. In a normal terminal
@@ -519,27 +566,28 @@ a shell-config perspective, and differences show up far downstream.
 
 `SHELL` is appended only if absent rather than assigned unconditionally,
 so a future SwiftTerm that provides it wins over our value. It's derived
-from `shellExecutable`, the same constant `startProcess` launches, so the
-two can't drift.
+from `ShellEnvironment.executable`, the same constant `startProcess`
+launches, so the two can't drift.
 
-`terminalContentFrame(in:)` insets by `terminalPadding` (8pt) and then
-vertically centers the content within that padding. This exists because
-SwiftTerm derives its row count as `Int(height / cellHeight)` — a floor
-operation — which almost never divides the available height evenly; a
-plain edge inset leaves the leftover slack stuck at the bottom, reading as
-content pinned to the top. `estimatedCellHeight(for:)` mirrors SwiftTerm's
-own internal calculation (`AppleTerminalView.computeFontDimensions`:
+`TerminalLayout.contentFrame(in:)` insets by `TerminalTheme.padding` (8pt)
+and then vertically centers the content within that padding. This exists
+because SwiftTerm derives its row count as `Int(height / cellHeight)` — a
+floor operation — which almost never divides the available height evenly;
+a plain edge inset leaves the leftover slack stuck at the bottom, reading
+as content pinned to the top. `estimatedCellHeight(for:)` mirrors
+SwiftTerm's own internal calculation (`AppleTerminalView.computeFontDimensions`:
 ascent + descent + leading at 1.0 line spacing) so the padding can predict
-the row count before SwiftTerm lays out. `terminalFontSize` (11pt) and
-`terminalPadding` (8pt) are chosen together so a ~57-60pt Dock height
-lands on exactly two visible rows.
+the row count before SwiftTerm lays out. `TerminalTheme.fontSize` (11pt)
+and `TerminalTheme.padding` (8pt) are chosen together so a ~57-60pt Dock
+height lands on exactly two visible rows.
 
 Because centering depends on the panel's live height, the terminal's
 `autoresizingMask` is `[.width]` only — height is NOT auto-flexible.
-`syncFrameToDock()` explicitly recomputes `terminalView.frame` via
-`terminalContentFrame(in:)` every time it resizes the panel, rather than
-letting AppKit's autoresizing stretch the terminal to fill the new size
-(which would rewiden the padding asymmetrically as the panel resizes).
+`applyFrame(_:)` explicitly recomputes `terminalView.frame` via
+`TerminalLayout.contentFrame(in:)` every time it resizes the panel, rather
+than letting AppKit's autoresizing stretch the terminal to fill the new
+size (which would rewiden the padding asymmetrically as the panel
+resizes).
 
 ### Expand/collapse
 
