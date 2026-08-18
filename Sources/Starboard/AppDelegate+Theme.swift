@@ -1,17 +1,37 @@
 import Cocoa
 
 extension AppDelegate {
-    @objc func selectTheme(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
-        let theme = Theme.theme(id: id)
+    func applyTheme(_ theme: Theme, persist: Bool) {
         currentTheme = theme
-        UserDefaults.standard.set(theme.id, forKey: "themeID")
-
         tintView.layer?.backgroundColor = theme.panelTintColor.cgColor
         terminalView.nativeForegroundColor = theme.foregroundColor
         terminalView.installColors(theme.ansiPalette)
+        if persist {
+            UserDefaults.standard.set(theme.id, forKey: "themeID")
+        }
+    }
 
-        sender.menu?.items.forEach { $0.state = .off }
-        sender.state = .on
+    @objc func toggleThemePicker(_ sender: Any?) {
+        if let picker = themePickerView {
+            picker.removeFromSuperview()
+            themePickerView = nil
+            panel.makeFirstResponder(terminalView)
+            return
+        }
+        guard let container = panel.contentView else { return }
+
+        let picker = ThemePickerView(themes: Theme.all, selectedID: currentTheme.id)
+        picker.frame.origin = NSPoint(
+            x: container.bounds.maxX - picker.frame.width - 10,
+            y: container.bounds.maxY - picker.frame.height - 10)
+        picker.onCommit = { [weak self] theme in
+            self?.applyTheme(theme, persist: true)
+            self?.toggleThemePicker(nil)
+        }
+        picker.onCancel = { [weak self] in self?.toggleThemePicker(nil) }
+
+        container.addSubview(picker)
+        themePickerView = picker
+        panel.makeFirstResponder(picker)
     }
 }

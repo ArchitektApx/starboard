@@ -12,6 +12,9 @@ extension AppDelegate {
             withTitle: "Toggle Expanded", action: #selector(toggleExpanded(_:)), keyEquivalent: "e"
         )
         appMenu.addItem(
+            withTitle: "Switch Theme", action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"
+        )
+        appMenu.addItem(
             withTitle: "Quit Starboard", action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q")
 
@@ -24,17 +27,6 @@ extension AppDelegate {
             withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(
             withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-
-        let themeMenuItem = NSMenuItem()
-        mainMenu.addItem(themeMenuItem)
-        let themeMenu = NSMenu(title: "Theme")
-        themeMenuItem.submenu = themeMenu
-        for theme in Theme.all {
-            let item = themeMenu.addItem(
-                withTitle: theme.name, action: #selector(selectTheme(_:)), keyEquivalent: "")
-            item.representedObject = theme.id
-            item.state = theme.id == currentTheme.id ? .on : .off
-        }
 
         NSApp.mainMenu = mainMenu
     }

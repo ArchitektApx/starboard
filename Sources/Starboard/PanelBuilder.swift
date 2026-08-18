@@ -47,7 +47,7 @@ enum PanelBuilder {
         terminal.nativeForegroundColor = theme.foregroundColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
         terminal.installColors(theme.ansiPalette)
-        terminal.toolTip = "⌘E expand · ⌘Q quit"
+        terminal.toolTip = "⌘E expand · ⌘T theme · ⌘Q quit"
 
         effectView.addSubview(terminal)
         panel.contentView = effectView
