@@ -3,11 +3,13 @@ import Cocoa
 enum FallbackHintPanel {
     static let padding: CGFloat = 10
     static let closeButtonSize: CGFloat = 14
+    static let mascotWidth: CGFloat = 36
+    static let mascotRowGap: CGFloat = 8
 
     static func make(
         message: String, width: CGFloat, theme: Theme, target: AnyObject, action: Selector
-    ) -> (panel: NSPanel, tintView: NSView, label: NSTextField) {
-        let textWidth = width - padding * 2 - closeButtonSize - 4
+    ) -> (panel: NSPanel, tintView: NSView, label: NSTextField, mascot: MascotView) {
+        let textWidth = width - padding * 2
         let font = TerminalTheme.font
         let attributed = NSAttributedString(string: message, attributes: [.font: font])
         let textHeight = ceil(
@@ -15,7 +17,8 @@ enum FallbackHintPanel {
                 with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading]
             ).height)
-        let height = textHeight + padding * 2
+        let mascotHeight = (mascotWidth * MascotView.aspectRatio).rounded(.up)
+        let height = padding + mascotHeight + mascotRowGap + textHeight + padding
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
@@ -62,6 +65,14 @@ enum FallbackHintPanel {
         label.drawsBackground = false
         effectView.addSubview(label)
 
+        let mascot = MascotView(
+            frame: NSRect(
+                x: padding, y: padding + textHeight + mascotRowGap,
+                width: mascotWidth, height: mascotHeight))
+        effectView.addSubview(mascot)
+        let laneWidth = width - padding - closeButtonSize - 6 - padding
+        mascot.configureLane(width: laneWidth)
+
         let closeButton = NSButton(
             image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Dismiss")!,
             target: target, action: action)
@@ -77,6 +88,6 @@ enum FallbackHintPanel {
 
         panel.contentView = effectView
 
-        return (panel, tintView, label)
+        return (panel, tintView, label, mascot)
     }
 }

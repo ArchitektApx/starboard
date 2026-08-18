@@ -67,6 +67,15 @@ for how it works — it's small and the names are literal.
   outside its own window's frame — no clipping-mask trick fixes that.
   The picker anchors to the main panel's bottom edge and grows upward
   in screen coordinates instead.
+- **`MascotView`'s walk/blink/look timers must be started and stopped on
+  actual window visibility transitions, not on every call to
+  `updateFallbackHintVisibility`** — that function runs on every Dock-
+  tracking tick (up to every 60ms while auto-hide is on), so unconditionally
+  starting/stopping there would constantly reset the animation cadence.
+  `dismissFallbackHint`/`updateFallbackHintVisibility` check `hint.isVisible`
+  first and only touch the timers on an actual show/hide edge; otherwise a
+  dismissed-but-still-allocated hint panel (it's `orderOut`, not deallocated)
+  would tick its timers forever in the background.
 
 ## Known open items
 

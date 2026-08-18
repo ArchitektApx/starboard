@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var hintPanel: NSPanel?
     var hintTintView: NSView?
     var hintLabel: NSTextField?
+    var hintMascot: MascotView?
     var hintDismissed = false
 
     var cachedDockOrientation = "bottom"
