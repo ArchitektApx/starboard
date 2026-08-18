@@ -3,6 +3,7 @@ import SwiftTerm
 
 struct Theme {
     let id: String
+    let isDark: Bool
     let name: String
     let panelTintColor: NSColor
     let foregroundColor: NSColor
@@ -27,6 +28,7 @@ extension Theme {
 
     static let nebula = Theme(
         id: "nebula",
+        isDark: true,
         name: "Nebula",
         panelTintColor: nsColor(5, 9, 15, alpha: 0.65),
         foregroundColor: .labelColor,
@@ -52,6 +54,7 @@ extension Theme {
 
     static let green = Theme(
         id: "green",
+        isDark: true,
         name: "Terminal Green",
         panelTintColor: nsColor(0, 8, 0, alpha: 0.82),
         foregroundColor: nsColor(70, 255, 120),
@@ -77,6 +80,7 @@ extension Theme {
 
     static let dracula = Theme(
         id: "dracula",
+        isDark: true,
         name: "Dracula",
         panelTintColor: nsColor(40, 42, 54, alpha: 0.78),
         foregroundColor: nsColor(248, 248, 242),
@@ -102,6 +106,7 @@ extension Theme {
 
     static let nord = Theme(
         id: "nord",
+        isDark: true,
         name: "Nord",
         panelTintColor: nsColor(46, 52, 64, alpha: 0.78),
         foregroundColor: nsColor(216, 222, 233),
@@ -127,6 +132,7 @@ extension Theme {
 
     static let gruvboxDark = Theme(
         id: "gruvbox-dark",
+        isDark: true,
         name: "Gruvbox Dark",
         panelTintColor: nsColor(40, 40, 40, alpha: 0.82),
         foregroundColor: nsColor(235, 219, 178),
@@ -152,6 +158,7 @@ extension Theme {
 
     static let solarizedDark = Theme(
         id: "solarized-dark",
+        isDark: true,
         name: "Solarized Dark",
         panelTintColor: nsColor(0, 43, 54, alpha: 0.82),
         foregroundColor: nsColor(131, 148, 150),
@@ -177,6 +184,7 @@ extension Theme {
 
     static let monokai = Theme(
         id: "monokai",
+        isDark: true,
         name: "Monokai",
         panelTintColor: nsColor(39, 40, 34, alpha: 0.82),
         foregroundColor: nsColor(248, 248, 242),
@@ -202,6 +210,7 @@ extension Theme {
 
     static let oneDark = Theme(
         id: "one-dark",
+        isDark: true,
         name: "One Dark",
         panelTintColor: nsColor(40, 44, 52, alpha: 0.82),
         foregroundColor: nsColor(171, 178, 191),
@@ -227,6 +236,7 @@ extension Theme {
 
     static let tokyoNight = Theme(
         id: "tokyo-night",
+        isDark: true,
         name: "Tokyo Night",
         panelTintColor: nsColor(26, 27, 38, alpha: 0.82),
         foregroundColor: nsColor(192, 202, 245),
@@ -252,6 +262,7 @@ extension Theme {
 
     static let catppuccinMocha = Theme(
         id: "catppuccin-mocha",
+        isDark: true,
         name: "Catppuccin Mocha",
         panelTintColor: nsColor(30, 30, 46, alpha: 0.82),
         foregroundColor: nsColor(205, 214, 244),
@@ -279,6 +290,7 @@ extension Theme {
 
     static let solarizedLight = Theme(
         id: "solarized-light",
+        isDark: false,
         name: "Solarized Light",
         panelTintColor: nsColor(253, 246, 227, alpha: 0.85),
         foregroundColor: nsColor(101, 123, 131),
@@ -304,6 +316,7 @@ extension Theme {
 
     static let gruvboxLight = Theme(
         id: "gruvbox-light",
+        isDark: false,
         name: "Gruvbox Light",
         panelTintColor: nsColor(251, 241, 199, alpha: 0.85),
         foregroundColor: nsColor(60, 56, 54),
@@ -329,6 +342,7 @@ extension Theme {
 
     static let oneLight = Theme(
         id: "one-light",
+        isDark: false,
         name: "One Light",
         panelTintColor: nsColor(250, 250, 250, alpha: 0.85),
         foregroundColor: nsColor(56, 58, 66),
@@ -354,6 +368,7 @@ extension Theme {
 
     static let catppuccinLatte = Theme(
         id: "catppuccin-latte",
+        isDark: false,
         name: "Catppuccin Latte",
         panelTintColor: nsColor(239, 241, 245, alpha: 0.85),
         foregroundColor: nsColor(76, 79, 105),
@@ -379,6 +394,7 @@ extension Theme {
 
     static let ayuLight = Theme(
         id: "ayu-light",
+        isDark: false,
         name: "Ayu Light",
         panelTintColor: nsColor(250, 250, 250, alpha: 0.85),
         foregroundColor: nsColor(92, 97, 102),
@@ -404,6 +420,7 @@ extension Theme {
 
     static let githubLight = Theme(
         id: "github-light",
+        isDark: false,
         name: "GitHub Light",
         panelTintColor: nsColor(255, 255, 255, alpha: 0.85),
         foregroundColor: nsColor(36, 41, 46),
@@ -429,6 +446,7 @@ extension Theme {
 
     static let paperColorLight = Theme(
         id: "papercolor-light",
+        isDark: false,
         name: "PaperColor Light",
         panelTintColor: nsColor(238, 238, 238, alpha: 0.85),
         foregroundColor: nsColor(68, 68, 68),
@@ -454,6 +472,7 @@ extension Theme {
 
     static let rosePineDawn = Theme(
         id: "rose-pine-dawn",
+        isDark: false,
         name: "Rosé Pine Dawn",
         panelTintColor: nsColor(250, 244, 237, alpha: 0.85),
         foregroundColor: nsColor(87, 82, 121),
@@ -479,6 +498,7 @@ extension Theme {
 
     static let tomorrowLight = Theme(
         id: "tomorrow-light",
+        isDark: false,
         name: "Tomorrow",
         panelTintColor: nsColor(255, 255, 255, alpha: 0.85),
         foregroundColor: nsColor(77, 77, 76),
@@ -504,6 +524,7 @@ extension Theme {
 
     static let nordLight = Theme(
         id: "nord-light",
+        isDark: false,
         name: "Nord Light",
         panelTintColor: nsColor(236, 239, 244, alpha: 0.85),
         foregroundColor: nsColor(46, 52, 64),

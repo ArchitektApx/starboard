@@ -4,6 +4,16 @@ final class ThemePickerView: NSView {
     private let themes: [Theme]
     private var selectedIndex: Int
     private let rowHeight: CGFloat = 22
+    private let headerHeight: CGFloat = 18
+
+    private struct Row {
+        let theme: Theme?
+        let header: String?
+        let y: CGFloat
+        let height: CGFloat
+    }
+
+    private let rows: [Row]
 
     var onCommit: ((Theme) -> Void)?
     var onCancel: (() -> Void)?
@@ -11,8 +21,25 @@ final class ThemePickerView: NSView {
     init(themes: [Theme], selectedID: String) {
         self.themes = themes
         self.selectedIndex = themes.firstIndex { $0.id == selectedID } ?? 0
-        let height = CGFloat(themes.count) * rowHeight + 8
-        super.init(frame: NSRect(x: 0, y: 0, width: 170, height: height))
+
+        var rows: [Row] = []
+        var y: CGFloat = 4
+        var lastIsDark: Bool?
+        for theme in themes {
+            if theme.isDark != lastIsDark {
+                rows.append(
+                    Row(
+                        theme: nil, header: theme.isDark ? "DARK" : "LIGHT", y: y,
+                        height: headerHeight))
+                y += headerHeight
+                lastIsDark = theme.isDark
+            }
+            rows.append(Row(theme: theme, header: nil, y: y, height: rowHeight))
+            y += rowHeight
+        }
+        self.rows = rows
+
+        super.init(frame: NSRect(x: 0, y: 0, width: 190, height: y + 4))
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
         layer?.cornerRadius = 8
@@ -29,22 +56,31 @@ final class ThemePickerView: NSView {
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        for (index, theme) in themes.enumerated() {
-            let rowRect = NSRect(
-                x: 4, y: 4 + CGFloat(index) * rowHeight, width: bounds.width - 8,
-                height: rowHeight)
-            if index == selectedIndex {
+        let selectedID = themes[selectedIndex].id
+        for row in rows {
+            if let header = row.header {
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .foregroundColor: NSColor.white.withAlphaComponent(0.4),
+                    .font: NSFont.systemFont(ofSize: 9, weight: .semibold),
+                ]
+                let origin = NSPoint(x: 10, y: row.y + row.height - 13)
+                header.draw(at: origin, withAttributes: attributes)
+                continue
+            }
+            guard let theme = row.theme else { continue }
+            let rowRect = NSRect(x: 4, y: row.y, width: bounds.width - 8, height: row.height)
+            let isSelected = theme.id == selectedID
+            if isSelected {
                 NSColor.white.withAlphaComponent(0.2).setFill()
                 NSBezierPath(roundedRect: rowRect, xRadius: 5, yRadius: 5).fill()
             }
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: NSColor.white,
-                .font: NSFont.systemFont(
-                    ofSize: 12, weight: index == selectedIndex ? .semibold : .regular),
+                .font: NSFont.systemFont(ofSize: 12, weight: isSelected ? .semibold : .regular),
             ]
             let textSize = theme.name.size(withAttributes: attributes)
             let origin = NSPoint(
-                x: rowRect.minX + 10, y: rowRect.minY + (rowHeight - textSize.height) / 2)
+                x: rowRect.minX + 10, y: rowRect.minY + (rowRect.height - textSize.height) / 2)
             theme.name.draw(at: origin, withAttributes: attributes)
         }
     }
