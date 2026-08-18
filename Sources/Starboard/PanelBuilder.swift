@@ -3,8 +3,14 @@ import CoreGraphics
 import SwiftTerm
 
 enum PanelBuilder {
-    static func makePanel(initialFrame: NSRect, theme: Theme) -> (
-        panel: KeyablePanel, terminal: LocalProcessTerminalView, tintView: NSView
+    static let menuButtonSize: CGFloat = 15
+    static let menuButtonInset: CGFloat = 5
+
+    static func makePanel(
+        initialFrame: NSRect, theme: Theme, menuTarget: AnyObject, menuAction: Selector
+    ) -> (
+        panel: KeyablePanel, terminal: LocalProcessTerminalView, tintView: NSView,
+        menuButton: NSButton
     ) {
         let panel = KeyablePanel(
             contentRect: initialFrame,
@@ -50,8 +56,25 @@ enum PanelBuilder {
         terminal.toolTip = "⌘E expand · ⌘T theme · ⌘Q quit"
 
         effectView.addSubview(terminal)
+
+        let menuButton = NSButton(
+            image: NSImage(
+                systemSymbolName: "ellipsis.circle", accessibilityDescription: "Menu")!,
+            target: menuTarget, action: menuAction)
+        menuButton.frame = NSRect(
+            x: effectView.bounds.width - menuButtonSize - menuButtonInset,
+            y: effectView.bounds.height - menuButtonSize - menuButtonInset,
+            width: menuButtonSize, height: menuButtonSize)
+        menuButton.autoresizingMask = [.minXMargin, .minYMargin]
+        menuButton.isBordered = false
+        menuButton.imagePosition = .imageOnly
+        menuButton.contentTintColor = theme.chromeTintColor
+        (menuButton.cell as? NSButtonCell)?.imageScaling = .scaleProportionallyDown
+        menuButton.toolTip = "Menu"
+        effectView.addSubview(menuButton)
+
         panel.contentView = effectView
 
-        return (panel, terminal, tintView)
+        return (panel, terminal, tintView, menuButton)
     }
 }

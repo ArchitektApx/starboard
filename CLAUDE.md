@@ -19,13 +19,14 @@ here, not inline.
 
 Plain SPM executable, no Xcode project, no Info.plist — `main.swift` sets
 `.accessory` activation policy directly instead. `AppDelegate`'s behavior
-is split across `AppDelegate+*.swift` extensions by concern (menu,
-Dock-tracking state machine, Dock-relative geometry, screen resolution,
-Dock Accessibility reads, debug logging, theme switching, the Accessibility
-fallback hint); `DockPresence`, `PanelBuilder`, `TerminalTheme`, `Theme`,
-`ThemePickerView`, `TerminalLayout`, `ShellEnvironment`, `FallbackHintPanel`,
-and `MascotImage` are standalone. Read the code for how it works — it's
-small and the names are literal.
+is split across `AppDelegate+*.swift` extensions by concern (the invisible
+main menu bar, the clickable popup panel menu, Dock-tracking state
+machine, Dock-relative geometry, screen resolution, Dock Accessibility
+reads, debug logging, theme switching, the Accessibility fallback hint);
+`DockPresence`, `PanelBuilder`, `TerminalTheme`, `Theme`, `ThemePickerView`,
+`TerminalLayout`, `ShellEnvironment`, `FallbackHintPanel`, and
+`MascotImage` are standalone. Read the code for how it works — it's small
+and the names are literal.
 
 `MascotImage` (a static NSImage decoded from an embedded base64 PNG — no
 SPM resource bundle, matching the "no Info.plist, no asset catalog"
@@ -73,14 +74,17 @@ purpose for a future session, not dead code to clean up.
   `homebrew/cask`, because that tap requires notarization and Starboard is
   ad-hoc signed only. `.github/workflows/release.yml` updates the cask's
   version/sha256 automatically on every tag push.
-- **Starboard's own menu bar never actually appears** — `.accessory` apps
-  only get their menu bar shown while active, and the panel is a
-  `.nonactivatingPanel` that never makes the app active. A visible
-  clickable "Theme" submenu was tried and was permanently unreachable.
-  Menu key equivalents (Cmd+E, Cmd+T, Cmd+Q) still work regardless,
-  because `NSApplication` matches them against the responder chain
-  independent of menu-bar visibility — so any future menu-driven feature
-  needs a keyboard shortcut, not a clickable item, to actually be usable.
+- **Starboard's own menu bar (`NSApp.mainMenu`) never actually appears** —
+  `.accessory` apps only get their menu bar shown while active, and the
+  panel is a `.nonactivatingPanel` that never makes the app active. A
+  visible clickable "Theme" submenu *in that menu bar* was tried and was
+  permanently unreachable by mouse. Its key equivalents (Cmd+E, Cmd+T,
+  Cmd+Q) still work regardless, because `NSApplication` matches them
+  against the responder chain independent of menu-bar visibility. This is
+  specific to the installed main menu bar, though — an ad-hoc `NSMenu`
+  shown via `.popUp(positioning:at:in:)` from a button click (what
+  `AppDelegate+PanelMenu.swift` does) is a completely different code path
+  and works fine by mouse, same as any status-item dropdown.
 - **The theme picker is its own floating panel, not a subview of the main
   one.** The main panel is only as tall as the Dock's icon tray when
   collapsed (often well under 100pt), and a subview can never draw

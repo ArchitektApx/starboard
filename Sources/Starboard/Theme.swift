@@ -8,6 +8,10 @@ struct Theme {
     let panelTintColor: NSColor
     let foregroundColor: NSColor
     let ansiPalette: [Color]
+
+    var chromeTintColor: NSColor {
+        isDark ? NSColor.white.withAlphaComponent(0.55) : NSColor.black.withAlphaComponent(0.4)
+    }
 }
 
 extension Theme {
