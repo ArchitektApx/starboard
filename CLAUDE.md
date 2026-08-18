@@ -21,10 +21,18 @@ Plain SPM executable, no Xcode project, no Info.plist — `main.swift` sets
 `.accessory` activation policy directly instead. `AppDelegate`'s behavior
 is split across `AppDelegate+*.swift` extensions by concern (menu,
 Dock-tracking state machine, Dock-relative geometry, screen resolution,
-Dock Accessibility reads, debug logging, theme switching); `DockPresence`,
-`PanelBuilder`, `TerminalTheme`, `Theme`, `ThemePickerView`,
-`TerminalLayout`, and `ShellEnvironment` are standalone. Read the code
-for how it works — it's small and the names are literal.
+Dock Accessibility reads, debug logging, theme switching, the Accessibility
+fallback hint); `DockPresence`, `PanelBuilder`, `TerminalTheme`, `Theme`,
+`ThemePickerView`, `TerminalLayout`, `ShellEnvironment`, `FallbackHintPanel`,
+and `MascotImage` are standalone. Read the code for how it works — it's
+small and the names are literal.
+
+`MascotImage` (a static NSImage decoded from an embedded base64 PNG — no
+SPM resource bundle, matching the "no Info.plist, no asset catalog"
+philosophy) is what the fallback hint panel actually shows. `MascotView`
+is a separate, currently-unwired, hand-drawn animated version of the same
+mascot (walk-cycle legs, blink, look-around) — kept in the tree on
+purpose for a future session, not dead code to clean up.
 
 ## Non-obvious gotchas (not discoverable by reading the code)
 
@@ -67,21 +75,17 @@ for how it works — it's small and the names are literal.
   outside its own window's frame — no clipping-mask trick fixes that.
   The picker anchors to the main panel's bottom edge and grows upward
   in screen coordinates instead.
-- **`MascotView`'s leg-frame `Timer` must be added to `RunLoop.main` in
-  `.common` mode, not created via `Timer.scheduledTimer` (default mode
-  only)** — confirmed by hand: with default mode the mascot rendered but
-  never animated, legs frozen. `AppDelegate+Tracking.swift`'s own
-  `trackingTimer` already does this for the same reason; `MascotView`
-  originally didn't and silently never fired.
-- **`MascotView`'s blink/look/leg timers must be started and stopped on
-  actual window visibility transitions, not on every call to
-  `updateFallbackHintVisibility`** — that function runs on every Dock-
-  tracking tick (up to every 60ms while auto-hide is on), so unconditionally
-  starting/stopping there would constantly reset the animation cadence.
-  `dismissFallbackHint`/`updateFallbackHintVisibility` check `hint.isVisible`
-  first and only touch the timers on an actual show/hide edge; otherwise a
-  dismissed-but-still-allocated hint panel (it's `orderOut`, not deallocated)
-  would tick its timers forever in the background.
+- **`MascotView` is currently unwired** — the fallback hint shows the
+  static `MascotImage` instead. Its leg-frame `Timer` originally used
+  `Timer.scheduledTimer`'s default run-loop mode, which — like
+  `AppDelegate+Tracking.swift`'s `trackingTimer` before it was fixed the
+  same way — silently never fired; switching to `RunLoop.main.add(_:forMode:
+  .common)` fixed it in an isolated test (a plain `MascotView` pumped
+  outside the app), but the mascot still didn't visibly animate once
+  embedded in the actual child `NSPanel`. Root cause not found before the
+  animation was shelved in favor of a still image — worth a fresh look
+  before re-wiring it, rather than assuming the `.common` fix alone is
+  sufficient.
 
 ## Known open items
 

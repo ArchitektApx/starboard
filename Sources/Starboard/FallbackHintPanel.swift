@@ -3,12 +3,12 @@ import Cocoa
 enum FallbackHintPanel {
     static let padding: CGFloat = 10
     static let closeButtonSize: CGFloat = 14
-    static let mascotWidth: CGFloat = 36
+    static let mascotWidth: CGFloat = 32
     static let mascotRowGap: CGFloat = 8
 
     static func make(
         message: String, width: CGFloat, theme: Theme, target: AnyObject, action: Selector
-    ) -> (panel: NSPanel, tintView: NSView, label: NSTextField, mascot: MascotView) {
+    ) -> (panel: NSPanel, tintView: NSView, label: NSTextField) {
         let textWidth = width - padding * 2
         let font = TerminalTheme.font
         let attributed = NSAttributedString(string: message, attributes: [.font: font])
@@ -17,7 +17,7 @@ enum FallbackHintPanel {
                 with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading]
             ).height)
-        let mascotHeight = (mascotWidth * MascotView.aspectRatio).rounded(.up)
+        let mascotHeight = (mascotWidth * MascotImage.aspectRatio).rounded(.up)
         let height = padding + mascotHeight + mascotRowGap + textHeight + padding
 
         let panel = NSPanel(
@@ -65,10 +65,12 @@ enum FallbackHintPanel {
         label.drawsBackground = false
         effectView.addSubview(label)
 
-        let mascot = MascotView(
+        let mascot = NSImageView(
             frame: NSRect(
                 x: (width - mascotWidth) / 2, y: padding + textHeight + mascotRowGap,
                 width: mascotWidth, height: mascotHeight))
+        mascot.image = MascotImage.image
+        mascot.imageScaling = .scaleProportionallyUpOrDown
         effectView.addSubview(mascot)
 
         let closeButton = NSButton(
@@ -86,6 +88,6 @@ enum FallbackHintPanel {
 
         panel.contentView = effectView
 
-        return (panel, tintView, label, mascot)
+        return (panel, tintView, label)
     }
 }

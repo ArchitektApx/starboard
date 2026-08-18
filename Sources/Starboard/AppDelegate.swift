@@ -21,7 +21,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var hintPanel: NSPanel?
     var hintTintView: NSView?
     var hintLabel: NSTextField?
-    var hintMascot: MascotView?
     var hintDismissed = false
 
     var cachedDockOrientation = "bottom"
@@ -60,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.makeFirstResponder(terminal)
 
         if !accessibilityTrusted {
-            installFallbackHintIfNeeded(hasLaunchedBefore: hasLaunchedBefore)
+            installFallbackHintIfNeeded()
             updateFallbackHintVisibility()
         }
 
