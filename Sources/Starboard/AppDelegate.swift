@@ -25,9 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var lastDebugLine: [String: String] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let promptOptions =
-            [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-        let accessibilityTrusted = AXIsProcessTrustedWithOptions(promptOptions)
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        let accessibilityTrusted = AXIsProcessTrusted()
+        UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
 
         setUpMainMenu()
 
@@ -53,10 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.makeFirstResponder(terminal)
 
         if !accessibilityTrusted {
-            terminal.feed(
-                text:
-                    "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n"
-            )
+            let message =
+                hasLaunchedBefore
+                ? "Not glued to Dock? Remove Starboard in System Settings → Accessibility, then re-add it.\r\n"
+                : "Starboard needs Accessibility permission to track the Dock's position and size — that's the only thing it reads. macOS will ask in a moment; grant it in System Settings → Privacy & Security → Accessibility and Starboard will snap in beside the Dock.\r\n\r\n"
+            terminal.feed(text: message)
         }
 
         terminal.startProcess(
@@ -67,6 +68,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         startTrackingTimer()
+
+        if !accessibilityTrusted {
+            let promptOptions =
+                [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            let promptDelay: TimeInterval = hasLaunchedBefore ? 0 : 1.2
+            DispatchQueue.main.asyncAfter(deadline: .now() + promptDelay) {
+                _ = AXIsProcessTrustedWithOptions(promptOptions)
+            }
+        }
 
         NotificationCenter.default.addObserver(
             self,
