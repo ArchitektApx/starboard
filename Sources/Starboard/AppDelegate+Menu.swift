@@ -25,6 +25,17 @@ extension AppDelegate {
         editMenu.addItem(
             withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
+        let themeMenuItem = NSMenuItem()
+        mainMenu.addItem(themeMenuItem)
+        let themeMenu = NSMenu(title: "Theme")
+        themeMenuItem.submenu = themeMenu
+        for theme in Theme.all {
+            let item = themeMenu.addItem(
+                withTitle: theme.name, action: #selector(selectTheme(_:)), keyEquivalent: "")
+            item.representedObject = theme.id
+            item.state = theme.id == currentTheme.id ? .on : .off
+        }
+
         NSApp.mainMenu = mainMenu
     }
 

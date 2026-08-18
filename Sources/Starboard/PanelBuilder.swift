@@ -3,8 +3,8 @@ import CoreGraphics
 import SwiftTerm
 
 enum PanelBuilder {
-    static func makePanel(initialFrame: NSRect) -> (
-        panel: KeyablePanel, terminal: LocalProcessTerminalView
+    static func makePanel(initialFrame: NSRect, theme: Theme) -> (
+        panel: KeyablePanel, terminal: LocalProcessTerminalView, tintView: NSView
     ) {
         let panel = KeyablePanel(
             contentRect: initialFrame,
@@ -36,7 +36,7 @@ enum PanelBuilder {
         let tintView = NSView(frame: effectView.bounds)
         tintView.autoresizingMask = [.width, .height]
         tintView.wantsLayer = true
-        tintView.layer?.backgroundColor = TerminalTheme.panelTintColor.cgColor
+        tintView.layer?.backgroundColor = theme.panelTintColor.cgColor
         effectView.addSubview(tintView)
 
         let terminal = LocalProcessTerminalView(
@@ -44,14 +44,14 @@ enum PanelBuilder {
         terminal.autoresizingMask = [.width]
         terminal.font = TerminalTheme.font
         terminal.nativeBackgroundColor = .clear
-        terminal.nativeForegroundColor = .labelColor
+        terminal.nativeForegroundColor = theme.foregroundColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor
-        terminal.installColors(TerminalTheme.ansiPalette)
+        terminal.installColors(theme.ansiPalette)
         terminal.toolTip = "⌘E expand · ⌘Q quit"
 
         effectView.addSubview(terminal)
         panel.contentView = effectView
 
-        return (panel, terminal)
+        return (panel, terminal, tintView)
     }
 }

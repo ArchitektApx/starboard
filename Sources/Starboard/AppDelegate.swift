@@ -6,7 +6,9 @@ import SwiftTerm
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var panel: NSPanel!
     var terminalView: LocalProcessTerminalView!
+    var tintView: NSView!
     var trackingTimer: Timer!
+    var currentTheme = Theme.theme(id: UserDefaults.standard.string(forKey: "themeID") ?? "")
 
     var isExpanded = false
     var isFrozen = false
@@ -36,9 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         collapsedFrame = initialFrame
         lastPresenceUntracked = initialPresence?.isUntracked ?? true
 
-        let (panel, terminal) = PanelBuilder.makePanel(initialFrame: initialFrame)
+        let (panel, terminal, tintView) = PanelBuilder.makePanel(
+            initialFrame: initialFrame, theme: currentTheme)
         self.panel = panel
         self.terminalView = terminal
+        self.tintView = tintView
 
         if case .concealed? = initialPresence {
             debugLog("visibility", "launching concealed (auto-hiding Dock is off screen)")
