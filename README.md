@@ -1,3 +1,5 @@
+<img src="assets/AppIcon.png" width="96" height="96" alt="Starboard icon" />
+
 # Starboard
 
 [![Latest release](https://img.shields.io/github/v/release/palamim/starboard)](https://github.com/palamim/starboard/releases/latest)
