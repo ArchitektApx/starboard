@@ -19,7 +19,9 @@ first place.
 - A real, persistent shell (`zsh -l`) — `cd`, history, and state carry
   over between commands, not a one-shot command runner.
 - Its own dark look and a muted, nautical ANSI color palette by default,
-  with Nebula, Terminal Green, Dracula, and Nord to switch between.
+  with 20 built-in themes (10 dark, 10 light — Gruvbox, Solarized,
+  Monokai, One Dark/Light, Tokyo Night, Catppuccin, and more) to switch
+  between.
 - Cmd+E expands it to full screen height for when Dock-height isn't
   enough, then Cmd+E again to snap back.
 - Cmd+T pops up a theme picker — ↑/↓ to pick, Enter to apply, Esc to
@@ -139,7 +141,7 @@ losing your place.
 ## Security & trust
 
 Starboard makes no network requests and collects no data — there's
-nothing in the source that could, since it's just over 1,000 lines
+nothing in the source that could, since it's just over 1,400 lines
 across 17 Swift files, worth reading yourself rather than taking on
 faith. The one
 sensitive-looking permission it asks for, Accessibility, is used for
