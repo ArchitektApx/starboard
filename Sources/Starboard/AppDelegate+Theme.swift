@@ -12,26 +12,39 @@ extension AppDelegate {
     }
 
     @objc func toggleThemePicker(_ sender: Any?) {
-        if let picker = themePickerView {
-            picker.removeFromSuperview()
-            themePickerView = nil
+        if let pickerPanel = themePickerPanel {
+            pickerPanel.orderOut(nil)
+            themePickerPanel = nil
+            panel.makeKeyAndOrderFront(nil)
             panel.makeFirstResponder(terminalView)
             return
         }
-        guard let container = panel.contentView else { return }
 
         let picker = ThemePickerView(themes: Theme.all, selectedID: currentTheme.id)
-        picker.frame.origin = NSPoint(
-            x: container.bounds.maxX - picker.frame.width - 10,
-            y: container.bounds.maxY - picker.frame.height - 10)
         picker.onCommit = { [weak self] theme in
             self?.applyTheme(theme, persist: true)
             self?.toggleThemePicker(nil)
         }
         picker.onCancel = { [weak self] in self?.toggleThemePicker(nil) }
 
-        container.addSubview(picker)
-        themePickerView = picker
-        panel.makeFirstResponder(picker)
+        let origin = NSPoint(
+            x: panel.frame.maxX - picker.frame.width - 10,
+            y: panel.frame.minY)
+        let pickerPanel = KeyablePanel(
+            contentRect: NSRect(origin: origin, size: picker.frame.size),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        pickerPanel.level = NSWindow.Level(rawValue: Int(kCGDockWindowLevel) + 2)
+        pickerPanel.isOpaque = false
+        pickerPanel.backgroundColor = .clear
+        pickerPanel.hidesOnDeactivate = false
+        pickerPanel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        pickerPanel.contentView = picker
+
+        pickerPanel.makeKeyAndOrderFront(nil)
+        pickerPanel.makeFirstResponder(picker)
+        themePickerPanel = pickerPanel
     }
 }

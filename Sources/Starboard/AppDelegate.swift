@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var tintView: NSView!
     var trackingTimer: Timer!
     var currentTheme = Theme.theme(id: UserDefaults.standard.string(forKey: "themeID") ?? "")
-    var themePickerView: ThemePickerView?
+    var themePickerPanel: KeyablePanel?
 
     var isExpanded = false
     var isFrozen = false
