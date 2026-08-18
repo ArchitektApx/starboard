@@ -25,7 +25,6 @@ final class MascotView: NSView {
     private static let gridHeight: CGFloat = 13
     static let aspectRatio: CGFloat = gridHeight / gridWidth
 
-    private var facingLeft = false
     private var legFrameA = true
     private var blinking = false
     private var look: Look = .bottomRight
@@ -34,21 +33,13 @@ final class MascotView: NSView {
     private var blinkWorkItem: DispatchWorkItem?
     private var lookWorkItem: DispatchWorkItem?
 
-    private var laneMinX: CGFloat = 0
-    private var laneMaxX: CGFloat = 0
-    private var walking = false
-
-    func configureLane(width laneWidth: CGFloat) {
-        laneMinX = frame.minX
-        laneMaxX = max(laneMinX, laneMinX + laneWidth - frame.width)
-        walking = laneMaxX > laneMinX
-    }
-
     func startAnimating() {
         stopAnimating()
-        legTimer = Timer.scheduledTimer(withTimeInterval: 0.34, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.34, repeats: true) { [weak self] _ in
             self?.stepFrame()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        legTimer = timer
         scheduleBlink()
         scheduleLook()
     }
@@ -70,18 +61,6 @@ final class MascotView: NSView {
 
     private func stepFrame() {
         legFrameA.toggle()
-        if walking {
-            let step: CGFloat = facingLeft ? -4 : 4
-            var nextX = frame.minX + step
-            if nextX <= laneMinX {
-                nextX = laneMinX
-                facingLeft = false
-            } else if nextX >= laneMaxX {
-                nextX = laneMaxX
-                facingLeft = true
-            }
-            frame.origin.x = nextX
-        }
         needsDisplay = true
     }
 
@@ -116,14 +95,7 @@ final class MascotView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let unit = bounds.width / Self.gridWidth
-
-        ctx.saveGState()
-        if facingLeft {
-            ctx.translateBy(x: bounds.width, y: 0)
-            ctx.scaleBy(x: -1, y: 1)
-        }
 
         func fill(_ gx: CGFloat, _ gy: CGFloat, _ gw: CGFloat, _ gh: CGFloat, _ color: NSColor) {
             let y = bounds.height - (gy + gh) * unit
@@ -153,7 +125,5 @@ final class MascotView: NSView {
         let rightLeg: CGFloat = legFrameA ? 1 : 2
         fill(5, 10, 2, leftLeg, Self.bodyColor)
         fill(9, 10, 2, rightLeg, Self.bodyColor)
-
-        ctx.restoreGState()
     }
 }

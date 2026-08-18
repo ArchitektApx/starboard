@@ -67,11 +67,9 @@ enum FallbackHintPanel {
 
         let mascot = MascotView(
             frame: NSRect(
-                x: padding, y: padding + textHeight + mascotRowGap,
+                x: (width - mascotWidth) / 2, y: padding + textHeight + mascotRowGap,
                 width: mascotWidth, height: mascotHeight))
         effectView.addSubview(mascot)
-        let laneWidth = width - padding - closeButtonSize - 6 - padding
-        mascot.configureLane(width: laneWidth)
 
         let closeButton = NSButton(
             image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Dismiss")!,

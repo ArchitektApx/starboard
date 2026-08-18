@@ -67,7 +67,13 @@ for how it works — it's small and the names are literal.
   outside its own window's frame — no clipping-mask trick fixes that.
   The picker anchors to the main panel's bottom edge and grows upward
   in screen coordinates instead.
-- **`MascotView`'s walk/blink/look timers must be started and stopped on
+- **`MascotView`'s leg-frame `Timer` must be added to `RunLoop.main` in
+  `.common` mode, not created via `Timer.scheduledTimer` (default mode
+  only)** — confirmed by hand: with default mode the mascot rendered but
+  never animated, legs frozen. `AppDelegate+Tracking.swift`'s own
+  `trackingTimer` already does this for the same reason; `MascotView`
+  originally didn't and silently never fired.
+- **`MascotView`'s blink/look/leg timers must be started and stopped on
   actual window visibility transitions, not on every call to
   `updateFallbackHintVisibility`** — that function runs on every Dock-
   tracking tick (up to every 60ms while auto-hide is on), so unconditionally
