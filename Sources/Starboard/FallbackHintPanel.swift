@@ -7,10 +7,10 @@ enum FallbackHintPanel {
     static let mascotRowGap: CGFloat = 8
 
     static func make(
-        message: String, width: CGFloat, theme: Theme, target: AnyObject, action: Selector
+        message: String, width: CGFloat, theme: Theme, cornerRadius: CGFloat, tintOpacity: CGFloat?,
+        font: NSFont, target: AnyObject, action: Selector
     ) -> (panel: NSPanel, tintView: NSView, label: NSTextField) {
         let textWidth = width - padding * 2
-        let font = TerminalTheme.font
         let attributed = NSAttributedString(string: message, attributes: [.font: font])
         let textHeight = ceil(
             attributed.boundingRect(
@@ -42,7 +42,7 @@ enum FallbackHintPanel {
         effectView.blendingMode = .behindWindow
         effectView.state = .active
         effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = TerminalTheme.cornerRadius
+        effectView.layer?.cornerRadius = cornerRadius
         effectView.layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
         effectView.layer?.masksToBounds = true
         effectView.layer?.borderWidth = 1
@@ -51,7 +51,7 @@ enum FallbackHintPanel {
         let tintView = NSView(frame: bounds)
         tintView.autoresizingMask = [.width, .height]
         tintView.wantsLayer = true
-        tintView.layer?.backgroundColor = theme.panelTintColor.cgColor
+        tintView.layer?.backgroundColor = theme.tintColor(opacity: tintOpacity).cgColor
         effectView.addSubview(tintView)
 
         let label = NSTextField(wrappingLabelWithString: message)

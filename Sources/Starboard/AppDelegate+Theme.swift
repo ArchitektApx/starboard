@@ -3,7 +3,7 @@ import Cocoa
 extension AppDelegate {
     func applyTheme(_ theme: Theme, persist: Bool) {
         currentTheme = theme
-        tintView.layer?.backgroundColor = theme.panelTintColor.cgColor
+        tintView.layer?.backgroundColor = theme.tintColor(opacity: PanelSettings.tintOpacity).cgColor
         terminalView.nativeForegroundColor = theme.foregroundColor
         terminalView.installColors(theme.ansiPalette)
         menuButton.contentTintColor = theme.chromeTintColor

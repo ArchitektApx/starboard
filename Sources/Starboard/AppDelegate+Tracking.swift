@@ -159,7 +159,7 @@ extension AppDelegate {
 
         let layoutTerminal = {
             self.terminalView.frame = TerminalLayout.contentFrame(
-                in: NSRect(origin: .zero, size: frame.size))
+                in: NSRect(origin: .zero, size: frame.size), font: self.terminalView.font)
             self.positionFallbackHint()
         }
 

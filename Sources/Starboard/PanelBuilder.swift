@@ -34,7 +34,7 @@ enum PanelBuilder {
         effectView.blendingMode = .behindWindow
         effectView.state = .active
         effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = TerminalTheme.cornerRadius
+        effectView.layer?.cornerRadius = PanelSettings.cornerRadius
         effectView.layer?.masksToBounds = true
         effectView.layer?.borderWidth = 1
         effectView.layer?.borderColor = NSColor.white.withAlphaComponent(0.2).cgColor
@@ -42,13 +42,14 @@ enum PanelBuilder {
         let tintView = NSView(frame: effectView.bounds)
         tintView.autoresizingMask = [.width, .height]
         tintView.wantsLayer = true
-        tintView.layer?.backgroundColor = theme.panelTintColor.cgColor
+        tintView.layer?.backgroundColor = theme.tintColor(opacity: PanelSettings.tintOpacity).cgColor
         effectView.addSubview(tintView)
 
+        let font = TerminalTheme.font(named: PanelSettings.fontName)
         let terminal = LocalProcessTerminalView(
-            frame: TerminalLayout.contentFrame(in: effectView.bounds))
+            frame: TerminalLayout.contentFrame(in: effectView.bounds, font: font))
         terminal.autoresizingMask = [.width]
-        terminal.font = TerminalTheme.font
+        terminal.font = font
         terminal.nativeBackgroundColor = .clear
         terminal.nativeForegroundColor = theme.foregroundColor
         terminal.layer?.backgroundColor = NSColor.clear.cgColor

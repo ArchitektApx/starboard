@@ -16,6 +16,8 @@ extension AppDelegate {
         guard hintPanel == nil else { return }
         let (hint, tintView, label) = FallbackHintPanel.make(
             message: Self.fallbackHintMessage, width: Self.fallbackWidth, theme: currentTheme,
+            cornerRadius: PanelSettings.cornerRadius, tintOpacity: PanelSettings.tintOpacity,
+            font: TerminalTheme.font(named: PanelSettings.fontName),
             target: self, action: #selector(dismissFallbackHint))
         hintPanel = hint
         hintTintView = tintView
@@ -23,7 +25,7 @@ extension AppDelegate {
     }
 
     func applyThemeToFallbackHint(_ theme: Theme) {
-        hintTintView?.layer?.backgroundColor = theme.panelTintColor.cgColor
+        hintTintView?.layer?.backgroundColor = theme.tintColor(opacity: PanelSettings.tintOpacity).cgColor
         hintLabel?.textColor = theme.foregroundColor
     }
 

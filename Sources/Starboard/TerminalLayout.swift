@@ -2,10 +2,10 @@ import Cocoa
 import CoreText
 
 enum TerminalLayout {
-    static func contentFrame(in bounds: NSRect) -> NSRect {
+    static func contentFrame(in bounds: NSRect, font: NSFont) -> NSRect {
         let usableWidth = bounds.width - TerminalTheme.padding * 2
         let usableHeight = bounds.height - TerminalTheme.padding * 2
-        let cellHeight = estimatedCellHeight(for: TerminalTheme.font)
+        let cellHeight = estimatedCellHeight(for: font)
         let rows = max(1, Int(usableHeight / cellHeight))
         let contentHeight = CGFloat(rows) * cellHeight
         let verticalSlack = (usableHeight - contentHeight) / 2

@@ -22,11 +22,26 @@ Plain SPM executable, no Xcode project, no Info.plist — `main.swift` sets
 is split across `AppDelegate+*.swift` extensions by concern (the invisible
 main menu bar, the clickable popup panel menu, Dock-tracking state
 machine, Dock-relative geometry, screen resolution, Dock Accessibility
-reads, debug logging, theme switching, the Accessibility fallback hint);
-`DockPresence`, `PanelBuilder`, `TerminalTheme`, `Theme`, `ThemePickerView`,
-`TerminalLayout`, `ShellEnvironment`, `FallbackHintPanel`, and
-`MascotImage` are standalone. Read the code for how it works — it's small
-and the names are literal.
+reads, debug logging, theme switching, panel appearance settings, the
+Accessibility fallback hint); `DockPresence`, `PanelBuilder`,
+`TerminalTheme`, `PanelSettings`, `Theme`, `ThemePickerView`,
+`SettingsPanelView`, `TerminalLayout`, `ShellEnvironment`,
+`FallbackHintPanel`, and `MascotImage` are standalone. Read the code for
+how it works — it's small and the names are literal.
+
+Panel corner radius, background tint opacity, and terminal font are all
+user-adjustable at runtime via the "Settings…" panel menu item
+(`SettingsPanelView`/`AppDelegate+Settings.swift`), persisted in
+`UserDefaults` through `PanelSettings`. Corner radius always has a
+concrete value (defaults to `TerminalTheme.defaultCornerRadius` until
+overridden); tint opacity is `nil` until the user touches the slider, so
+switching themes still shows each theme's own baked-in alpha rather than
+silently forcing one opacity on every theme; font name likewise falls
+back to `TerminalTheme.defaultFontName` (the first installed Nerd Font in
+`TerminalTheme.availableFontNames`, else the system monospace font) until
+overridden. Panel width was deliberately left out of this — the whole
+product idea is gluing to the Dock's tray width, so that one stays a
+hardcoded constant in `TerminalLayout`.
 
 `MascotImage` (a static NSImage decoded from an embedded base64 PNG — no
 SPM resource bundle, matching the "no Info.plist, no asset catalog"

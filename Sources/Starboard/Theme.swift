@@ -12,6 +12,10 @@ struct Theme {
     var chromeTintColor: NSColor {
         isDark ? NSColor.white.withAlphaComponent(0.55) : NSColor.black.withAlphaComponent(0.4)
     }
+
+    func tintColor(opacity: CGFloat?) -> NSColor {
+        panelTintColor.withAlphaComponent(opacity ?? panelTintColor.alphaComponent)
+    }
 }
 
 extension Theme {

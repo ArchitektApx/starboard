@@ -14,6 +14,10 @@ extension AppDelegate {
             NSMenuItem(
                 title: "Theme: \(currentTheme.name)",
                 action: #selector(toggleThemePicker(_:)), keyEquivalent: "t"))
+        menu.addItem(
+            NSMenuItem(
+                title: "Settings…",
+                action: #selector(toggleSettingsPanel(_:)), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(
             NSMenuItem(

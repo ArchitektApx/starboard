@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var trackingTimer: Timer!
     var currentTheme = Theme.theme(id: UserDefaults.standard.string(forKey: "themeID") ?? "")
     var themePickerPanel: KeyablePanel?
+    var settingsPanel: KeyablePanel?
 
     var isExpanded = false
     var isFrozen = false
