@@ -4,6 +4,7 @@ final class SettingsPanelView: NSView {
     private let padding: CGFloat = 12
     private let rowGap: CGFloat = 14
     private let controlWidth: CGFloat = 200
+    private let closeButtonSize: CGFloat = 14
 
     private let cornerRadiusSlider = NSSlider()
     private let tintOpacitySlider = NSSlider()
@@ -22,7 +23,7 @@ final class SettingsPanelView: NSView {
 
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: 0))
         wantsLayer = true
-        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
         layer?.cornerRadius = 8
         layer?.masksToBounds = true
         layer?.borderWidth = 1
@@ -31,8 +32,21 @@ final class SettingsPanelView: NSView {
         var y: CGFloat = padding
 
         let title = Self.makeLabel("Settings", size: 12, weight: .semibold, alpha: 0.85)
-        title.frame = NSRect(x: padding, y: y, width: controlWidth, height: 16)
+        title.frame = NSRect(
+            x: padding, y: y, width: controlWidth - closeButtonSize - 6, height: 16)
         addSubview(title)
+
+        let closeButton = NSButton(
+            image: NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close")!,
+            target: self, action: #selector(closeTapped))
+        closeButton.frame = NSRect(
+            x: width - padding - closeButtonSize, y: y + 1,
+            width: closeButtonSize, height: closeButtonSize)
+        closeButton.isBordered = false
+        closeButton.imagePosition = .imageOnly
+        closeButton.contentTintColor = NSColor.white.withAlphaComponent(0.5)
+        (closeButton.cell as? NSButtonCell)?.imageScaling = .scaleProportionallyDown
+        addSubview(closeButton)
         y += 16 + rowGap
 
         let radiusLabel = Self.makeLabel("Corner radius")
@@ -133,6 +147,10 @@ final class SettingsPanelView: NSView {
 
     @objc private func resetTapped() {
         onReset?()
+    }
+
+    @objc private func closeTapped() {
+        onCancel?()
     }
 
     private static func makeLabel(

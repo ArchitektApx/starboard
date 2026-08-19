@@ -41,7 +41,7 @@ final class ThemePickerView: NSView {
 
         super.init(frame: NSRect(x: 0, y: 0, width: 190, height: y + 4))
         wantsLayer = true
-        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
         layer?.cornerRadius = 8
         layer?.masksToBounds = true
         layer?.borderWidth = 1
