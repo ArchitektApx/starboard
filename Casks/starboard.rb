@@ -1,6 +1,6 @@
 cask "starboard" do
-  version "0.15.0"
-  sha256 "7115eb581c2fcbb8bdf0fb6e95d965bc5dbdf9c62d73b5bf764d300743ae99d6"
+  version "0.16.0"
+  sha256 "15373c18eded348e2f91c82e39d9a50b61f1b145f5dd01697ef7c7818c8f1687"
 
   url "https://github.com/palamim/starboard/releases/download/v#{version}/Starboard.zip"
   name "Starboard"
